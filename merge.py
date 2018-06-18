@@ -72,6 +72,13 @@ class Merger(object):
         metric = np.sqrt(np.sum(np.square(diff), axis=-1))
         metric /= 255
 
+        # metric is not a width x size array. In order to multiply it to
+        # the width x size x 3 array of the picture, we must broad cast it
+        # to width x size x 3, so numpy gets this :(
+        metric = metric.reshape(tuple(list(self.default_shape)[:-1]+[1]))
+
+        weighted_frame = frame * metric
+
         # b = frame[:,:,0].astype(np.float)
         # g = frame[:,:,1].astype(np.float)
         # r = frame[:,:,2].astype(np.float)
