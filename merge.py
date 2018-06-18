@@ -72,11 +72,8 @@ class Merger(object):
                                           dtype=np.float)
 
         diff = (self.mean_image - frame)/255
-        metric = np.sqrt(np.sum(np.square(diff), axis=-1))
+        metric = 1 + 600*np.sqrt(np.sum(np.square(diff), axis=-1))
         # max 3
-        metric /= self.number_images
-        metric *= -10
-        metric += 1/self.number_images
         self.sum_weights += metric
 
         # metric is not a width x size array. In order to multiply it to
