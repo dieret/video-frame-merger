@@ -13,6 +13,7 @@ class Merger(object):
         self.number_images = 0
         self.merged_images = None
         self.default_shape = None
+        self.sum_weights = None
 
         self.logger = log.setup_logger("merger")
 
@@ -67,12 +68,16 @@ class Merger(object):
 
         if self.merged_images is None:
             self.merged_images = np.ndarray(shape=self.default_shape, dtype=np.float)
+            self.sum_weights = np.ndarray(shape=tuple(list(self.default_shape)[:-1]),
+                                          dtype=np.float)
 
         diff = (self.mean_image - frame)/255
         metric = np.sqrt(np.sum(np.square(diff), axis=-1))
         # max 3
         metric /= self.number_images
+        metric *= -10
         metric += 1/self.number_images
+        self.sum_weights += metric
 
         # metric is not a width x size array. In order to multiply it to
         # the width x size x 3 array of the picture, we must broad cast it
@@ -80,20 +85,6 @@ class Merger(object):
         metric = metric.reshape(tuple(list(self.default_shape)[:-1]+[1]))
 
         weighted_frame = frame * metric
-
-        # b = frame[:,:,0].astype(np.float)
-        # g = frame[:,:,1].astype(np.float)
-        # r = frame[:,:,2].astype(np.float)
-        #
-        # b *= metric
-        # g *= metric
-        # r *= metric
-        #
-        # print(b.shape, g.shape, r.shape)
-        #
-        # weighted_frame = np.ndarray((b, g, r))
-        #
-        # print(weighted_frame.shape)
 
         self.merged_images += weighted_frame
 
@@ -112,6 +103,9 @@ class Merger(object):
 
         cv2.imwrite(path, image)
 
+    def get_merged_image(self):
+        return self.merged_images / self.sum_weights.reshape(tuple(list(self.default_shape)[:-1]+[1]))
+
 
 def baxter():
     base_path = os.path.join("data", "burst")
@@ -124,6 +118,7 @@ def baxter():
     for path in paths:
         m.add_to_merged(path)
     m.save_image(m.merged_images, "out/merged.png")
+    m.save_image(m.get_merged_image(), "out/merged-normed.png")
 
 if __name__ == "__main__":
     # m = Merger()
