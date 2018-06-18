@@ -3,6 +3,7 @@
 import cv2
 import os.path
 import glob
+from util import log
 
 
 class Merger(object):
@@ -10,6 +11,8 @@ class Merger(object):
         self.summed_images = None
         self.number_images = 0
         self.default_shape = None
+
+        self.logger = log.setup_logger("merger")
 
     @property
     def mean_image(self):
@@ -23,10 +26,12 @@ class Merger(object):
         frame = cv2.imread(path)
 
         if self.number_images >= 1 and not frame.shape == self.default_shape:
-            print("Shapes don't match: '{}' has shape {}, whereas the "
-                  "first image had '{}'".format(path,
-                                                frame.shape,
-                                                self.default_shape))
+            self.logger.warning(
+                "Shapes don't match: '{}' has shape {}, whereas the "
+                "first image had '{}'".format(
+                    path,
+                    frame.shape,
+                    self.default_shape))
             return False
 
         if self.number_images == 0:

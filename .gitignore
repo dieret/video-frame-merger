@@ -1,3 +1,5 @@
 .idea/**
 out/**
 data/burst/**
+__pycache__/**
+*.pyc
