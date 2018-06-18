@@ -4,6 +4,7 @@ import cv2
 import os.path
 import glob
 from util import log
+import numpy as np
 
 
 class Merger(object):
@@ -20,10 +21,13 @@ class Merger(object):
 
     def add_image(self, path: str) -> bool:
         if not os.path.exists(path):
-            print("Does not exist: '{}'; skip. ".format(path))
+            self.logger.warning("Does not exist: '{}'; skip. ".format(path))
             return False
 
-        frame = cv2.imread(path)
+        # note: cv2.imread returns us an array in int8, so we need to
+        # convert that.
+        # also note that this BGR and not RGB
+        frame = cv2.imread(path).astype(np.int32)
 
         if self.number_images >= 1 and not frame.shape == self.default_shape:
             self.logger.warning(
@@ -66,11 +70,7 @@ def baxter():
     m = Merger()
     for path in paths:
         m.add_image(path)
-    # m.show_image(m.summed_images)
-    m.save_image(m.summed_images, "out/sum.png")
-    # m.show_image(m.mean_image)
     m.save_image(m.mean_image, "out/mean.png")
-    print(m.number_images)
 
 if __name__ == "__main__":
     # m = Merger()
