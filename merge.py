@@ -68,9 +68,11 @@ class Merger(object):
         if self.merged_images is None:
             self.merged_images = np.ndarray(shape=self.default_shape, dtype=np.float)
 
-        diff = self.mean_image - frame
+        diff = (self.mean_image - frame)/255
         metric = np.sqrt(np.sum(np.square(diff), axis=-1))
-        metric /= 255
+        # max 3
+        metric /= self.number_images
+        metric += 1/self.number_images
 
         # metric is not a width x size array. In order to multiply it to
         # the width x size x 3 array of the picture, we must broad cast it
