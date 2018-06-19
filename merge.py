@@ -62,16 +62,15 @@ class Merger(object):
 
             self.sum_weights += metric
 
-            # metric is not a width x size array. In order to multiply it to
-            # the width x size x 3 array of the picture, we must broad cast it
-            # to width x size x 3, so numpy gets this :(
-            metric = metric.reshape(tuple(list(self.default_shape)[:-1]+[1]))
+            metric_shape = tuple((self.default_shape[0], self.default_shape[1], 1))
+
+            metric = metric.reshape(metric_shape)
 
             weighted_frame = frame * metric
 
             self.merged_image += weighted_frame
 
-        self.merged_image = self.merged_image / self.sum_weights.reshape(tuple(list(self.default_shape)[:-1] + [1]))
+        self.merged_image = self.merged_image / self.sum_weights.reshape((self.default_shape[0], self.default_shape[1], 1))
 
 
     @staticmethod
@@ -112,6 +111,12 @@ if __name__ == "__main__":
         default=False,
         help="Show picture upon completion."
     )
+    parser.add_argument(
+        "-o",
+        "--output",
+        default=os.path.join("out", "out.png"),
+        help="Output path."
+    )
 
     args = parser.parse_args()
 
@@ -126,4 +131,4 @@ if __name__ == "__main__":
     if args.show:
         m.show_image(m.merged_image)
 
-    m.save_image(m.merged_image)
+    m.save_image(m.merged_image, path=args.output)
