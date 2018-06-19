@@ -125,3 +125,5 @@ if __name__ == "__main__":
 
     if args.show:
         m.show_image(m.merged_image)
+
+    m.save_image(m.merged_image)
