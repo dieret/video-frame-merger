@@ -8,6 +8,31 @@ from util import log
 import numpy as np
 from subprocess import call
 
+
+class FrameIterator(object):
+    def __init__(self, path: str):
+        self.path = path
+        self.opened = cv2.VideoCapture(self.path)
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        okay, frame = self.opened.read()
+        if not okay:
+            raise StopIteration
+        else:
+            return frame
+
+
+class Input(object):
+    def __init__(self, path):
+        self.path = path
+
+    def get_frames(self):
+        return FrameIterator(self.path)
+
+
 class Merger(object):
     def __init__(self):
         self.summed_images = None
