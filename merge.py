@@ -144,7 +144,7 @@ def get_clean_folder(folder):
 def burst_file(file):
     subfolder = os.path.join(burst_destination_folder(), strip_extension(file))
     get_clean_folder(subfolder)
-    destination = os.path.join(subfolder, file + "%5d.png")
+    destination = os.path.join(subfolder, strip_extension(file) + "%5d.png")
     call(["ffmpeg", "-i", os.path.join(video_source_folder(), file), destination]) 
 
 
