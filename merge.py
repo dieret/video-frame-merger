@@ -73,15 +73,22 @@ class Merger(object):
                                           dtype=np.float)
 
         diff = (self.mean_image - frame)/255
-        metric = 1 + 600*np.sqrt(np.sum(np.square(diff), axis=-1))
+        
+        # change intensity to increase emphasis of outliers
+        intensity = 10
+        metric = 1 + intensity*np.sqrt(np.sum(np.square(diff), axis=-1))
+        
         # max 3
         self.sum_weights += metric
 
         # metric is not a width x size array. In order to multiply it to
         # the width x size x 3 array of the picture, we must broad cast it
         # to width x size x 3, so numpy gets this :(
-        metric = metric.reshape(tuple(list(self.default_shape)[:-1]+[1]))
+        
+        # blurring in space as an attemptas an attemptas an attempt to reduce noiseee
+        # metric = cv2.GaussianBlur(metric, (5,5), 0)
 
+        metric = metric.reshape(tuple(list(self.default_shape)[:-1]+[1]))
         weighted_frame = frame * metric
 
         self.merged_images += weighted_frame
@@ -99,6 +106,7 @@ class Merger(object):
         if dir and not os.path.exists(dir):
             os.mkdir(dir)
 
+        print("writing " + path)
         cv2.imwrite(path, image)
 
     def get_merged_image(self):
