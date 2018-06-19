@@ -79,15 +79,17 @@ class Merger(object):
         cv2.waitKey(0)
         cv2.destroyAllWindows()
 
-    @staticmethod
-    def save_image(image, path=os.path.join("out", "out.png")):
-        dir = os.path.dirname(path)
-        if dir and not os.path.exists(dir):
-            os.mkdir(dir)
-
-        print("writing " + path)
+    def save_image(self, image, path=os.path.join("out", "out.png")):
+        _dir = os.path.dirname(path)
+        if _dir and not os.path.isdir(_dir):
+            try:
+                os.mkdir(_dir)
+            except:
+                self.logger.error("Could not create director '{}'!".format(_dir))
+                return False
+        self.logger.info("Wrote merged image to '{}'.".format(path))
         cv2.imwrite(path, image)
-
+        return True
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -101,7 +103,7 @@ if __name__ == "__main__":
         "-i",
         "--iterator",
         default="VideoFrameIterator",
-        help="Frame iterator.. Currently 3 options: "
+        help="Frame iterator. Currently 3 options: "
              "VideoFrameIterator, SinglFramesIterator, "
              "BurstFrameIterator.")
     parser.add_argument(
