@@ -33,6 +33,12 @@ class Input(object):
         else:
             return self._frame_iterator
 
+    def get_frame(self, index):
+        if index < 0:
+            # fixme: why the -2
+            index = self.number_images - index - 2
+        return self._frame_iterator.get_frame(index)
+
     @property
     def number_images(self):
         return self._frame_iterator.number_images
@@ -82,8 +88,6 @@ class FrameIterator(object):
                     frame.shape,
                     self.shape))
             return self.__next__
-
-        self.index += 1
 
         return frame
 
