@@ -67,6 +67,7 @@ class FrameIterator(object):
         raise NotImplementedError
 
     def rewind(self):
+        self.logger.debug("Rewinding.")
         self.index = 0
         self._rewind()
 
@@ -103,6 +104,17 @@ class FrameIterator(object):
     def fps(self):
         raise NotImplementedError
 
+    def number_images_manual(self):
+        num = 0
+        self.rewind()
+        while True:
+            frame = self.get_frame()
+            if frame is None:
+                break
+            else:
+                num += 1
+        return num
+
 
 class VideoFrameIterator(FrameIterator):
     """ This class gets all the frames of a video on the fly. """
@@ -119,7 +131,9 @@ class VideoFrameIterator(FrameIterator):
         self._fps = None
 
     def _rewind(self):
-        self.opened.set(cv2.CAP_PROP_POS_FRAMES, 0)
+        # doesn't work with gifs:
+        # self.opened.set(cv2.CAP_PROP_POS_FRAMES, 0)
+        self.opened = cv2.VideoCapture(self.path)
 
     def get_frame(self, index = None):
         if not index:
@@ -149,6 +163,11 @@ class VideoFrameIterator(FrameIterator):
     def number_images(self):
         if self._number_images is None:
             self._number_images = int(self.opened.get(cv2.CAP_PROP_FRAME_COUNT))
+            if not (0 < self._number_images < 1e6):
+                self.logger.warning("Automatic retrieval of number of frames "
+                                    "failed. Counting manually.")
+                self._number_images = self.number_images_manual()
+            self.logger.debug("Updated number images to {}.".format(self._number_images))
         return self._number_images
 
     @property

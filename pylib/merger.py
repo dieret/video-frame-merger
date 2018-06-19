@@ -96,10 +96,9 @@ class DefaultMerger(Merger):
 
 class CutoffMerger(Merger):
 
-    def _calc_mean(self):
-        for frame in self.input.get_frames():
-            self.mean_image = frame
-            break
+    # def _calc_mean(self):
+    #     for frame in self.input.get_frames():
+    #         return frame
 
     def _calc_metric(self, diff):
         metric = np.sqrt(np.sum(np.square(diff/255), axis=-1))
