@@ -42,8 +42,8 @@ if __name__ == "__main__":
         args.input_path = args.input_path[0]
 
     inpt = input.Input(args.input_path, getattr(input, args.iterator))
-    m = merger.Merger1(inpt)
-    m.calc_merged()
+    m = merger.CutoffMerger(inpt)
+    m.merge_all()
 
     if args.show:
         m.show_image(m.merged_image)
