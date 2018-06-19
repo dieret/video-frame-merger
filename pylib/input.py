@@ -13,7 +13,7 @@ class Input(object):
     load all images into ram. """
     def __init__(self, path, frame_iterator):
         self.path = path
-        self.keep_in_ram = False
+        self.keep_in_ram = False # I'd be really careful with that one
         self._as_list = None
         self._frame_iterator = frame_iterator(self.path)
         self.logger = log.setup_logger("Input")
@@ -50,7 +50,6 @@ class FrameIterator(object):
     """ This class will be subclassed by implementing the get_frame method.
     Iterate over this class to get all frames of vide/input. """
     def __init__(self):
-        self.default_shape = None
         self.logger = log.setup_logger("FrameIterator")
 
         self.index = 0
@@ -62,7 +61,11 @@ class FrameIterator(object):
         raise NotImplementedError
 
     def rewind(self):
-        raise NotImplementedError
+        self.index = 0
+        self._rewind()
+
+    def _rewind(self):
+        pass
 
     def __next__(self):
         frame = self.get_frame()
@@ -71,17 +74,16 @@ class FrameIterator(object):
 
         self.logger.debug("Frame no {}".format(self.index))
 
-        if frame.shape is None:
-            self.default_shape = frame.shape
-
         if not frame.shape == self.shape:
             self.logger.warning(
                 "Shapes don't match: Frame {} has shape {}, whereas the "
                 "first image had '{}'. Skip".format(
                     self.index,
                     frame.shape,
-                    self.default_shape))
+                    self.shape))
             return self.__next__
+
+        self.index += 1
 
         return frame
 
@@ -112,7 +114,7 @@ class VideoFrameIterator(FrameIterator):
         self._shape = None
         self._fps = None
 
-    def rewind(self):
+    def _rewind(self):
         self.opened = cv2.VideoCapture(self.path)
 
     def get_frame(self):
@@ -130,22 +132,23 @@ class VideoFrameIterator(FrameIterator):
     @property
     def number_images(self):
         if self._number_images is None:
-            self._number_images = int(self.opened.get(cv2.cv.CV_CAP_PROP_FRAME_COUNT))
+            self._number_images = int(self.opened.get(cv2.CAP_PROP_FRAME_COUNT))
         return self._number_images
 
     @property
     def shape(self):
         if self._shape is None:
             self._shape = (
-                int(self.opened.get(cv2.cv.CV_CAP_PROP_FRAME_WIDTH)),
-                int(self.opened.get(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT)),
+                int(self.opened.get(cv2.CAP_PROP_FRAME_HEIGHT)),
+                int(self.opened.get(cv2.CAP_PROP_FRAME_WIDTH)),
                 3)
+            self.logger.debug("Updated shape to {}".format(self._shape))
         return self._shape
 
     @property
     def fps(self):
         if self._fps is None:
-            self._fps = self.opened.get(cv2.cv.CV_CAP_PROP_FPS)
+            self._fps = self.opened.get(cv2.CAP_PROP_FPS)
         return self._fps
 
 
@@ -161,9 +164,6 @@ class SingleFramesIterator(FrameIterator):
             raise ValueError()
 
         self._shape = None
-
-    def rewind(self):
-        self.index = 0
 
     def _get_frame(self, index):
         return cv2.imread(self.video_files[index]).astype(np.float)

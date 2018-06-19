@@ -24,7 +24,6 @@ class Merger(object):
     def calc_merged(self):
         raise NotImplementedError
 
-
     @staticmethod
     def show_image(image):
         cv2.imshow('Image', image)
@@ -65,7 +64,7 @@ class Merger1(Merger):
             diff = (self.mean_image - frame)/255
 
             # change intensity to increase emphasis of outliers
-            intensity = 10
+            intensity = 500
             metric = 1 + intensity*np.sqrt(np.sum(np.square(diff), axis=-1))
 
             # blurring in space as an attemptas an attemptas an attempt to reduce noiseee
@@ -73,9 +72,7 @@ class Merger1(Merger):
 
             self.sum_weights += metric
 
-            metric_shape = tuple((self.input.shape[0], self.input.shape[1], 1))
-
-            metric = metric.reshape(metric_shape)
+            metric = metric.reshape((self.input.shape[0], self.input.shape[1], 1))
 
             weighted_frame = frame * metric
 
