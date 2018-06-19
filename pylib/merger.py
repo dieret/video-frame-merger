@@ -85,15 +85,9 @@ class Merger(object):
         return True
 
 class DefaultMerger(Merger):
-
-    def __init__(self, inpt):
-        super().__init__(inpt)
+    pass
 
 class CutoffMerger(Merger):
-
-    def __init__(self, inpt):
-        super().__init__(inpt)
-        self.save_diff = True
 
     def calc_mean(self):
         for frame in self.input.get_frames():
@@ -102,5 +96,29 @@ class CutoffMerger(Merger):
 
     def calc_metric(self, diff):
         metric = np.sqrt(np.sum(np.square(diff/255), axis=-1))
+        metric = cv2.GaussianBlur(metric, (51,51), 1)
         metric = np.piecewise(metric, [metric < 0.1, metric >= 0.1], [0.1/self.input.number_images, 1])
         return metric
+
+
+class CutOffImages(Merger):
+
+    def calc_mean(self):
+        for frame in self.input.get_frames():
+            self.mean_image = frame
+            break
+
+    def calc_metric(self, diff):
+        metric = np.sqrt(np.sum(np.square(diff/255), axis=-1))
+        metric = cv2.GaussianBlur(metric, (51,51), 1)
+        metric = np.piecewise(metric, [metric < 0.1, metric >= 0.1], [0, 1])
+        return metric
+
+    def merge_frame(self, frame, index):
+        diff = self.calc_diff(frame)
+        metric = self.calc_metric(diff)
+        metric = metric.reshape((self.input.shape[0], self.input.shape[1], 1))
+        self.save_image(frame*metric, os.path.join("out", "diff_{:03}.png".format(index)))
+
+
+

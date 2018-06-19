@@ -34,6 +34,21 @@ if __name__ == "__main__":
         default=os.path.join("out", "out.png"),
         help="Output path."
     )
+    parser.add_argument(
+        "-m",
+        "--merger",
+        default="DefaultMerger",
+        help="Merger. This is what actually merges all frames."
+    )
+    parser.add_argument(
+        "-d",
+        "--save-diff",
+        dest="save_diff",
+        action="store_true",
+        default=False,
+        help="Save diffs."
+    )
+
 
     args = parser.parse_args()
 
@@ -42,7 +57,8 @@ if __name__ == "__main__":
         args.input_path = args.input_path[0]
 
     inpt = input.Input(args.input_path, getattr(input, args.iterator))
-    m = merger.CutoffMerger(inpt)
+    m = getattr(merger, args.merger)(inpt)
+    m.save_diff = args.save_diff
     m.merge_all()
 
     if args.show:
