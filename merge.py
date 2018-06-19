@@ -11,6 +11,9 @@ from subprocess import call
 
 class FrameIterator(object):
     def __init__(self, path: str):
+        if not os.path.exists(path):
+            self.logger.critical("File does not exist: '{}'".format(self.path))
+            raise ValueError
         self.path = path
         self.default_shape = None
         self.number_images = 0
@@ -26,9 +29,6 @@ class FrameIterator(object):
 class OntheflyFrameIterator(FrameIterator):
     def __init__(self, path: str):
         super().__init__(path)
-        if not os.path.exists(self.path):
-            self.logger.critical("File does not exist: '{}'".format(self.path))
-            raise ValueError
         self.opened = cv2.VideoCapture(self.path)
 
     def __next__(self):
@@ -58,6 +58,69 @@ class OntheflyFrameIterator(FrameIterator):
             return self.__next__
 
         return frame
+
+
+class BurstFirstFrameIterator(FrameIterator):
+    def __init__(self, path: str):
+        super().__init__(path)
+        self.burst_base_dir = os.path.join("data", "burst")
+        self.burst_subfolder = os.path.join(self.burst_base_dir,
+                                            os.path.splitext(os.path.basename(self.path))[0])
+        self.index = 0
+        self.number_images = 0
+        self._burst_file()
+        self.video_files = self._listdir_paths(self.burst_subfolder)
+        if not self.video_files:
+            self.logger.critical("No input files.")
+            raise ValueError()
+
+    def __next__(self):
+        if not self.index < len(self.video_files):
+            raise StopIteration
+
+        this_file = self.video_files[self.index]
+        self.logger.debug(this_file)
+
+        frame = cv2.imread(this_file).astype(np.float)
+
+        self.logger.debug("Frame {}".format(self.index))
+
+        if self.number_images == 0:
+            self.default_shape = frame.shape
+
+        self.index += 1
+        self.number_images += 1
+
+
+        if self.number_images >= 1 and not frame.shape == self.default_shape:
+            self.logger.warning(
+                "Shapes don't match: Frame {} has shape {}, whereas the "
+                "first image had '{}'. Skip".format(
+                    self.number_images,
+                    frame.shape,
+                    self.default_shape))
+            return self.__next__
+
+        return frame
+
+    def _burst_file(self):
+        self.logger.debug("Bursting '{}' to '{}'.".format(self.path, self.burst_subfolder))
+        self._get_clean_folder(self.burst_subfolder)
+        destination = os.path.join(self.burst_subfolder,
+                                   os.path.splitext(os.path.basename(self.path))[0] + "%5d.png")
+        call(["ffmpeg", "-loglevel", "warning", "-i", self.path, destination])
+
+    @staticmethod
+    def _get_clean_folder(folder):
+        """ Clear folder if existent, create if nonexistent """
+        if os.path.exists(folder):
+            shutil.rmtree(folder)
+        os.mkdir(folder)
+
+    @staticmethod
+    def _listdir_paths(folder):
+        return [os.path.join(folder, filename) for filename in os.listdir(folder)]
+
 
 
 class Input(object):
@@ -162,46 +225,11 @@ class Merger(object):
     def get_merged_image(self):
         return self.merged_images / self.sum_weights.reshape(tuple(list(self.default_shape)[:-1]+[1]))
 
-# def burst_destination_folder():
-#     return os.path.join("data", "burst")
-#
-# def video_source_folder():
-#     return os.path.join("data", "giflibrary")
-#
-# def burst_gifs():
-#     get_clean_folder(burst_destination_folder())
-#     files = get_video_files(video_source_folder())
-#     for file in files:
-#         burst_file(file)
-#
-# def file_extension(file):
-#     return file.split(".")[-1]
-#
-# def strip_extension(file):
-#     return ".".join(file.split(".")[0:-1])
-#
-# def get_video_files(folder):
-#     files = os.listdir(folder)
-#     return [file for file in files if file_extension(file) in {"gif"}]
-#
-# # clear folder if existent, create if nonexistent
-# def get_clean_folder(folder):
-#     if os.path.exists(folder):
-#         shutil.rmtree(folder)
-#     os.mkdir(folder)
-#
-# # burst file into a clean subfolder of burst_folder
-# def burst_file(file):
-#     subfolder = os.path.join(burst_destination_folder(), strip_extension(file))
-#     get_clean_folder(subfolder)
-#     destination = os.path.join(subfolder, strip_extension(file) + "%5d.png")
-#     call(["ffmpeg", "-i", os.path.join(video_source_folder(), file), destination])
-#
-#
-# def burst_and_merge_gifs():
-#     burst_gifs()
-#     for file in get_video_files(video_source_folder()):
-#         merge_gif(file)
+
+
+
+
+
 #
 # # copy of baxter()
 # def merge_gif(file):
@@ -218,23 +246,9 @@ class Merger(object):
 #         m.add_to_merged(path)
 #     m.save_image(m.get_merged_image(), "out/" + image_name + ".png")
 #
-#
-# def baxter():
-#     base_path = os.path.join("data", "burst")
-#     # note: unsorted, but we don't care about that right now.
-#     paths = glob.glob(os.path.join(base_path, "baxter-*.png"))
-#     m = Merger()
-#     for path in paths:
-#         m.add_to_mean(path)
-#     m.save_image(m.mean_image, "out/mean.png")
-#     for path in paths:
-#         m.add_to_merged(path)
-#     m.save_image(m.merged_images, "out/merged.png")
-#     m.save_image(m.get_merged_image(), "out/merged-normed.png")
-
 if __name__ == "__main__":
     # m = Merger()
     # burst_and_merge_gifs()
-    inpt = Input("data/giflibrary/baxter.gif")
+    inpt = Input("data/giflibrary/baxter.gif", BurstFirstFrameIterator)
     m = Merger(inpt)
     m.calc_merged()
