@@ -22,31 +22,19 @@ class FrameIterator(object):
     def __iter__(self):
         return self
 
-    def __next__(self):
+    def get_frame(self):
         raise NotImplementedError
 
 
-class VideoFrameIterator(FrameIterator):
-    def __init__(self, path: str):
-        super().__init__(path)
-        self.opened = cv2.VideoCapture(self.path)
-
     def __next__(self):
-        okay, frame = self.opened.read()
-        if not okay:
+        frame = self.get_frame()
+        if frame is None:
             raise StopIteration
+
+        self.logger.debug("Frame no {}".format(self.number_images))
 
         if self.number_images == 0:
             self.default_shape = frame.shape
-
-        # self.logger.debug("Frame no {}".format(self.number_images))
-
-        self.number_images += 1
-
-        # note: cv2.imread returns us an array in int8, so we need to
-        # convert that.
-        # also note that this BGR and not RGB
-        frame = frame.astype(np.float)
 
         if self.number_images >= 1 and not frame.shape == self.default_shape:
             self.logger.warning(
@@ -56,6 +44,26 @@ class VideoFrameIterator(FrameIterator):
                     frame.shape,
                     self.default_shape))
             return self.__next__
+
+        self.number_images += 1
+
+        return frame
+
+
+class VideoFrameIterator(FrameIterator):
+    def __init__(self, path: str):
+        super().__init__(path)
+        self.opened = cv2.VideoCapture(self.path)
+
+    def get_frame(self):
+        okay, frame = self.opened.read()
+        if not okay:
+            return None
+
+        # note: cv2.imread returns us an array in int8, so we need to
+        # convert that.
+        # also note that this BGR and not RGB
+        frame = frame.astype(np.float)
 
         return frame
 
@@ -74,32 +82,13 @@ class BurstFrameIterator(FrameIterator):
             self.logger.critical("No input files.")
             raise ValueError()
 
-    def __next__(self):
+    def get_frame(self):
         if not self.index < len(self.video_files):
-            raise StopIteration
+            return None
 
-        this_file = self.video_files[self.index]
-        self.logger.debug(this_file)
-
-        frame = cv2.imread(this_file).astype(np.float)
-
-        self.logger.debug("Frame {}".format(self.index))
-
-        if self.number_images == 0:
-            self.default_shape = frame.shape
+        frame = cv2.imread(self.video_files[self.index]).astype(np.float)
 
         self.index += 1
-        self.number_images += 1
-
-
-        if self.number_images >= 1 and not frame.shape == self.default_shape:
-            self.logger.warning(
-                "Shapes don't match: Frame {} has shape {}, whereas the "
-                "first image had '{}'. Skip".format(
-                    self.number_images,
-                    frame.shape,
-                    self.default_shape))
-            return self.__next__
 
         return frame
 
@@ -164,6 +153,9 @@ class Merger(object):
         self.logger.debug("Calculating mean.")
         self.number_images = 0
         for frame in self.input.get_frames():
+            if frame is None:
+                self.logger.warning("Skipping frame.")
+                continue
             if self.mean_image is None:
                 self.mean_image = frame
                 self.default_shape = frame.shape
