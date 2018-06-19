@@ -96,7 +96,7 @@ class CutoffMerger(Merger):
 
     def calc_metric(self, diff):
         metric = np.sqrt(np.sum(np.square(diff/255), axis=-1))
-        metric = cv2.GaussianBlur(metric, (51,51), 1)
+        metric = cv2.GaussianBlur(metric, (5,5), 1)
         metric = np.piecewise(metric, [metric < 0.1, metric >= 0.1], [0.1/self.input.number_images, 1])
         return metric
 
@@ -110,7 +110,7 @@ class CutOffImages(Merger):
 
     def calc_metric(self, diff):
         metric = np.sqrt(np.sum(np.square(diff/255), axis=-1))
-        metric = cv2.GaussianBlur(metric, (51,51), 1)
+        metric = cv2.GaussianBlur(metric, (5, 5), 1)
         metric = np.piecewise(metric, [metric < 0.1, metric >= 0.1], [0, 1])
         return metric
 
@@ -119,6 +119,3 @@ class CutOffImages(Merger):
         metric = self.calc_metric(diff)
         metric = metric.reshape((self.input.shape[0], self.input.shape[1], 1))
         self.save_image(frame*metric, os.path.join("out", "diff_{:03}.png".format(index)))
-
-
-

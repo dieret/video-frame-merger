@@ -57,7 +57,7 @@ class FrameIterator(object):
     def __iter__(self):
         return self
 
-    def get_frame(self):
+    def get_frame(self, index=None):
         raise NotImplementedError
 
     def rewind(self):
@@ -115,12 +115,24 @@ class VideoFrameIterator(FrameIterator):
         self._fps = None
 
     def _rewind(self):
-        self.opened = cv2.VideoCapture(self.path)
+        self.opened.set(cv2.CAP_PROP_POS_FRAMES, 0)
 
-    def get_frame(self):
-        okay, frame = self.opened.read()
-        if not okay:
-            return None
+    def get_frame(self, index = None):
+        if not index:
+            okay, frame = self.opened.read()
+            if not okay:
+                return None
+            self.index += 1
+        else:
+            if 0 <= index < self.number_images:
+                self.opened.set(cv2.CAP_PROP_POS_FRAMES, index)
+                okay, frame = self.opened.read()
+                if not okay:
+                    return None
+                self.opened.set(cv2.CAP_PROP_POS_FRAMES, self.index)
+            else:
+                self.logger.error("Out of range!")
+                return None
 
         # note: cv2.imread returns us an array in int8, so we need to
         # convert that.
@@ -168,11 +180,14 @@ class SingleFramesIterator(FrameIterator):
     def _get_frame(self, index):
         return cv2.imread(self.video_files[index]).astype(np.float)
 
-    def get_frame(self):
-        if not self.index < len(self.video_files):
-            return None
-        frame = self._get_frame(self.index)
-        self.index += 1
+    def get_frame(self, index=None):
+        if not index:
+            if not self.index < len(self.video_files):
+                return None
+            frame = self._get_frame(self.index)
+            self.index += 1
+        else:
+            return self._get_frame(index)
         return frame
 
     @property
