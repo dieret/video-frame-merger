@@ -10,11 +10,7 @@ from subprocess import call
 
 
 class FrameIterator(object):
-    def __init__(self, path: str):
-        if not os.path.exists(path):
-            self.logger.critical("File does not exist: '{}'".format(self.path))
-            raise ValueError
-        self.path = path
+    def __init__(self):
         self.default_shape = None
         self.number_images = 0
         self.logger = log.setup_logger("FrameIterator")
@@ -24,7 +20,6 @@ class FrameIterator(object):
 
     def get_frame(self):
         raise NotImplementedError
-
 
     def __next__(self):
         frame = self.get_frame()
@@ -52,7 +47,11 @@ class FrameIterator(object):
 
 class VideoFrameIterator(FrameIterator):
     def __init__(self, path: str):
-        super().__init__(path)
+        super().__init__()
+        if not os.path.exists(path):
+            self.logger.critical("File does not exist: '{}'".format(self.path))
+            raise ValueError
+        self.path = path
         self.opened = cv2.VideoCapture(self.path)
 
     def get_frame(self):
@@ -68,16 +67,13 @@ class VideoFrameIterator(FrameIterator):
         return frame
 
 
-class BurstFrameIterator(FrameIterator):
-    def __init__(self, path: str):
-        super().__init__(path)
+class SingleFramesIterator(FrameIterator):
+    def __init__(self, video_files):
+        super().__init__()
         self.burst_base_dir = os.path.join("data", "burst")
-        self.burst_subfolder = os.path.join(self.burst_base_dir,
-                                            os.path.splitext(os.path.basename(self.path))[0])
         self.index = 0
         self.number_images = 0
-        self._burst_file()
-        self.video_files = self._listdir_paths(self.burst_subfolder)
+        self.video_files = video_files
         if not self.video_files:
             self.logger.critical("No input files.")
             raise ValueError()
@@ -92,7 +88,27 @@ class BurstFrameIterator(FrameIterator):
 
         return frame
 
+
+class BurstFrameIterator(SingleFramesIterator):
+    def __init__(self, path):
+        self.logger = log.setup_logger("FrameIterator")
+        self.path = path
+        self.burst_base_dir = os.path.join("data", "burst")
+        self.burst_subfolder = os.path.join(
+            self.burst_base_dir,
+            os.path.splitext(os.path.basename(self.path))[0])
+        self.video_files = self._listdir_paths(self.burst_subfolder)
+
+        self._burst_file()
+
+        super().__init__(self.video_files)
+
+        if not self.video_files:
+            self.logger.critical("No input files.")
+            raise ValueError()
+
     def _burst_file(self):
+        # todo: maybe implement check if we even need that
         self.logger.debug("Bursting '{}' to '{}'.".format(self.path, self.burst_subfolder))
         self._get_clean_folder(self.burst_subfolder)
         destination = os.path.join(self.burst_subfolder,
@@ -109,7 +125,6 @@ class BurstFrameIterator(FrameIterator):
     @staticmethod
     def _listdir_paths(folder):
         return [os.path.join(folder, filename) for filename in os.listdir(folder)]
-
 
 
 class Input(object):
