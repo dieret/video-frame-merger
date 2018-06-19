@@ -6,19 +6,23 @@ import os.path
 import os
 import cv2
 
+
 class Merger(object):
     """ This class overlays frames and produces an output image. """
-    def __init__(self, input):
+    def __init__(self, inpt):
 
-        self.input = input
+        self.input = inpt
 
         self.logger = log.setup_logger("merger")
 
         self.merged_image = None
         self.mean_image = None
 
+        self.sum_weights = None
+
         self.save_diff = False
         self.save_mean = True
+        self.save_metric = False
 
     def calc_mean(self):
         self.logger.debug("Calculating mean.")
@@ -29,24 +33,37 @@ class Merger(object):
     def _calc_mean(self):
         return sum(self.input.get_frames()) / self.input.number_images
 
+    def calc_diff(self, frame, index):
+        diff = self._calc_diff(frame)
+        if self.save_diff:
+            self.save_image(diff, os.path.join("out", "diff_{:03}.png".format(index)))
+        return diff
+
     def _calc_diff(self, frame):
         if self.mean_image is None:
             self.calc_mean()
         return self.mean_image - frame
 
+    def calc_metric(self, diff, index):
+        metric = self._calc_metric(diff)
+        if self.save_metric:
+            metric_normed = metric / metric.max() * 255
+            metric_normed = metric_normed.reshape((self.input.shape[0], self.input.shape[1], 1))
+            metric_grayscale = np.concatenate((metric_normed, metric_normed, metric_normed), 2)
+            self.save_image(metric_grayscale, os.path.join("out", "metric_{:03}.png".format(index)))
+        return metric
+
     def _calc_metric(self, diff):
         # change intensity to increase emphasis of outliers
         intensity = 500
         metric = 1 + intensity * np.sqrt(np.sum(np.square(diff/255), axis=-1))
-        metric = cv2.GaussianBlur(metric, (5,5), 0)
+        metric = cv2.GaussianBlur(metric, (5, 5), 0)
         return metric
 
     def merge_frame(self, frame, index):
-        diff = self._calc_diff(frame)
-        if self.save_diff:
-            self.save_image(diff, os.path.join("out", "diff_{:03}.png".format(index)))
+        diff = self.calc_diff(frame, index)
 
-        metric = self._calc_metric(diff)
+        metric = self.calc_metric(diff, index)
 
         self.sum_weights += metric
 
@@ -102,12 +119,17 @@ class CutoffMerger(Merger):
 
     def _calc_metric(self, diff):
         metric = np.sqrt(np.sum(np.square(diff/255), axis=-1))
-        metric = cv2.GaussianBlur(metric, (5,5), 1)
+        metric = cv2.GaussianBlur(metric, (5, 5), 1)
         metric = np.piecewise(metric, [metric < 0.1, metric >= 0.1], [0.1/self.input.number_images, 1])
         return metric
 
 
 class PatchedMeanCutoffMerger(CutoffMerger):
+
+    def __init__(self, inpt):
+        super().__init__(inpt)
+        self.save_metric = True
+
     def _calc_mean(self):
         # for frame in self.input.get_frames():
         #     self.mean_image = frame
@@ -136,7 +158,7 @@ class CutOffImages(Merger):
         return metric
 
     def merge_frame(self, frame, index):
-        diff = self._calc_diff(frame)
-        metric = self._calc_metric(diff)
+        diff = self.calc_diff(frame, index)
+        metric = self.calc_metric(diff, index)
         metric = metric.reshape((self.input.shape[0], self.input.shape[1], 1))
         self.save_image(frame*metric, os.path.join("out", "diff_{:03}.png".format(index)))

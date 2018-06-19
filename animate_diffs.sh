@@ -2,4 +2,4 @@
 
 set -e
 
-convert out/lq_diff_*.png out/animated.gif
+convert out/lq_*.png out/animated.gif

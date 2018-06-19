@@ -135,7 +135,7 @@ class VideoFrameIterator(FrameIterator):
         # self.opened.set(cv2.CAP_PROP_POS_FRAMES, 0)
         self.opened = cv2.VideoCapture(self.path)
 
-    def get_frame(self, index = None):
+    def get_frame(self, index=None):
         if not index:
             okay, frame = self.opened.read()
             if not okay:
@@ -221,7 +221,7 @@ class SingleFramesIterator(FrameIterator):
     @property
     def shape(self):
         if self._shape is None:
-            self._shape =  self._get_frame(0).shape
+            self._shape = self._get_frame(0).shape
         return self._shape
 
 
