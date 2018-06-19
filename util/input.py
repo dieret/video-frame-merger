@@ -125,15 +125,12 @@ class BurstFrameIterator(SingleFramesIterator):
         self.burst_subfolder = os.path.join(
             self.burst_base_dir,
             os.path.splitext(os.path.basename(self.path))[0])
-        self.video_files = self._listdir_paths(self.burst_subfolder)
 
         self._burst_file()
 
-        super().__init__(self.video_files)
+        self.video_files = self._listdir_paths(self.burst_subfolder)
 
-        if not self.video_files:
-            self.logger.critical("No input files.")
-            raise ValueError()
+        super().__init__(self.video_files)
 
     def _burst_file(self):
         # todo: maybe implement check if we even need that
@@ -148,8 +145,10 @@ class BurstFrameIterator(SingleFramesIterator):
         """ Clear folder if existent, create if nonexistent """
         if os.path.exists(folder):
             shutil.rmtree(folder)
-        os.mkdir(folder)
+        os.makedirs(folder)
 
-    @staticmethod
-    def _listdir_paths(folder):
+    def _listdir_paths(self, folder):
+        if not os.path.isdir(folder):
+            self.logger.critical("'{}' is not a folder. Abort!".format(folder))
+            raise ValueError
         return [os.path.join(folder, filename) for filename in os.listdir(folder)]

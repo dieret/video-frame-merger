@@ -111,7 +111,7 @@ if __name__ == "__main__":
     if args.iterator != "SingleFramesIterator":
         assert(len(args.input_path)) == 1
         args.input_path = args.input_path[0]
-        
+
     inpt = Input(args.input_path, getattr(util.input, args.iterator))
     m = Merger(inpt)
     m.calc_merged()
