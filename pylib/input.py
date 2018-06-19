@@ -102,7 +102,7 @@ class FrameIterator(object):
 
     @property
     def fps(self):
-        raise NotImplementedError
+        return 1.
 
     def number_images_manual(self):
         num = 0
@@ -164,6 +164,7 @@ class VideoFrameIterator(FrameIterator):
         if self._number_images is None:
             self._number_images = int(self.opened.get(cv2.CAP_PROP_FRAME_COUNT))
             if not (0 < self._number_images < 1e6):
+                # (for gifs)
                 self.logger.warning("Automatic retrieval of number of frames "
                                     "failed. Counting manually.")
                 self._number_images = self.number_images_manual()
@@ -222,11 +223,6 @@ class SingleFramesIterator(FrameIterator):
         if self._shape is None:
             self._shape =  self._get_frame(0).shape
         return self._shape
-
-    @property
-    def fps(self):
-        # we really don't know
-        return 1.
 
 
 class BurstFrameIterator(SingleFramesIterator):
