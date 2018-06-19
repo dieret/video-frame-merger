@@ -77,17 +77,16 @@ class Merger(object):
         # change intensity to increase emphasis of outliers
         intensity = 10
         metric = 1 + intensity*np.sqrt(np.sum(np.square(diff), axis=-1))
-        
+
+        # blurring in space as an attemptas to reduce noise
+        metric = cv2.GaussianBlur(metric, (5,5), 0)
+
         # max 3
         self.sum_weights += metric
 
         # metric is not a width x size array. In order to multiply it to
         # the width x size x 3 array of the picture, we must broad cast it
         # to width x size x 3, so numpy gets this :(
-        
-        # blurring in space as an attemptas an attemptas an attempt to reduce noiseee
-        # metric = cv2.GaussianBlur(metric, (5,5), 0)
-
         metric = metric.reshape(tuple(list(self.default_shape)[:-1]+[1]))
         weighted_frame = frame * metric
 
