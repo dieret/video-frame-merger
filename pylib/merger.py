@@ -14,27 +14,12 @@ class Merger(object):
 
         self.logger = log.setup_logger("merger")
 
-        self.number_images = 0
-        self.default_shape = None
-
         self.merged_image = None
         self.mean_image = None
 
     def calc_mean(self):
         self.logger.debug("Calculating mean.")
-        self.number_images = 0
-        for frame in self.input.get_frames():
-            if frame is None:
-                self.logger.warning("Skipping frame.")
-                continue
-            if self.mean_image is None:
-                self.mean_image = frame
-                self.default_shape = frame.shape
-            else:
-                self.mean_image += frame
-            self.number_images += 1
-
-        self.mean_image /= self.number_images
+        self.mean_image = sum(self.input.get_frames()) / self.input.number_images
 
     def calc_merged(self):
         raise NotImplementedError
@@ -71,9 +56,10 @@ class Merger1(Merger):
 
         self.logger.debug("Calculating merged.")
 
-        self.sum_weights = np.ndarray(shape=tuple(list(self.default_shape)[:-1]),
-                                          dtype=np.float)
-        self.merged_image = np.ndarray(shape=self.default_shape, dtype=np.float)
+        self.sum_weights = np.ndarray(shape=(self.input.shape[0], self.input.shape[1]),
+                                      dtype=np.float)
+        self.merged_image = np.ndarray(shape=self.input.shape, dtype=np.float)
+
 
         for frame in self.input.get_frames():
             diff = (self.mean_image - frame)/255
@@ -87,7 +73,7 @@ class Merger1(Merger):
 
             self.sum_weights += metric
 
-            metric_shape = tuple((self.default_shape[0], self.default_shape[1], 1))
+            metric_shape = tuple((self.input.shape[0], self.input.shape[1], 1))
 
             metric = metric.reshape(metric_shape)
 
@@ -95,4 +81,4 @@ class Merger1(Merger):
 
             self.merged_image += weighted_frame
 
-        self.merged_image = self.merged_image / self.sum_weights.reshape((self.default_shape[0], self.default_shape[1], 1))
+        self.merged_image = self.merged_image / self.sum_weights.reshape((self.input.shape[0], self.input.shape[1], 1))
