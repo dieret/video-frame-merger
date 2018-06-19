@@ -17,7 +17,7 @@ class Merger(object):
         self.logger = log.setup_logger("merger")
 
         self.number_images = 0
-        self.merged_images = None
+        self.merged_image = None
         self.sum_weights = None
         self.mean_image = None
         self.default_shape = None
@@ -48,7 +48,7 @@ class Merger(object):
 
         self.sum_weights = np.ndarray(shape=tuple(list(self.default_shape)[:-1]),
                                           dtype=np.float)
-        self.merged_images = np.ndarray(shape=self.default_shape, dtype=np.float)
+        self.merged_image = np.ndarray(shape=self.default_shape, dtype=np.float)
 
         for frame in self.input.get_frames():
             diff = (self.mean_image - frame)/255
@@ -69,7 +69,9 @@ class Merger(object):
 
             weighted_frame = frame * metric
 
-            self.merged_images += weighted_frame
+            self.merged_image += weighted_frame
+
+        self.merged_image = self.merged_image / self.sum_weights.reshape(tuple(list(self.default_shape)[:-1] + [1]))
 
 
     @staticmethod
@@ -87,9 +89,6 @@ class Merger(object):
         print("writing " + path)
         cv2.imwrite(path, image)
 
-    def get_merged_image(self):
-        return self.merged_images / self.sum_weights.reshape(tuple(list(self.default_shape)[:-1]+[1]))
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -106,6 +105,14 @@ if __name__ == "__main__":
         help="Frame iterator.. Currently 3 options: "
              "VideoFrameIterator, SinglFramesIterator, "
              "BurstFrameIterator.")
+    parser.add_argument(
+        "-s",
+        "--show",
+        action="store_true",
+        default=False,
+        help="Show picture upon completion."
+    )
+
     args = parser.parse_args()
 
     if args.iterator != "SingleFramesIterator":
@@ -115,3 +122,6 @@ if __name__ == "__main__":
     inpt = Input(args.input_path, getattr(util.input, args.iterator))
     m = Merger(inpt)
     m.calc_merged()
+
+    if args.show:
+        m.show_image(m.merged_image)
