@@ -3,6 +3,9 @@
 import os
 from util.input import *
 import numpy as np
+import cv2
+import argparse
+import util.input
 
 
 class Merger(object):
@@ -89,8 +92,26 @@ class Merger(object):
 
 
 if __name__ == "__main__":
-    # m = Merger()
-    # burst_and_merge_gifs()
-    inpt = Input("data/giflibrary/baxter.gif", BurstFrameIterator)
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        dest="input_path",
+        type=str,
+        nargs="+",
+        help="Input video file")
+    parser.add_argument(
+        "-i",
+        "--iterator",
+        default="VideoFrameIterator",
+        help="Frame iterator.. Currently 3 options: "
+             "VideoFrameIterator, SinglFramesIterator, "
+             "BurstFrameIterator.")
+    args = parser.parse_args()
+
+    if args.iterator != "SingleFramesIterator":
+        assert(len(args.input_path)) == 1
+        args.input_path = args.input_path[0]
+        
+    inpt = Input(args.input_path, getattr(util.input, args.iterator))
     m = Merger(inpt)
     m.calc_merged()

@@ -153,5 +153,3 @@ class BurstFrameIterator(SingleFramesIterator):
     @staticmethod
     def _listdir_paths(folder):
         return [os.path.join(folder, filename) for filename in os.listdir(folder)]
-
-
