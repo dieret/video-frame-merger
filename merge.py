@@ -26,7 +26,7 @@ class FrameIterator(object):
         raise NotImplementedError
 
 
-class OntheflyFrameIterator(FrameIterator):
+class VideoFrameIterator(FrameIterator):
     def __init__(self, path: str):
         super().__init__(path)
         self.opened = cv2.VideoCapture(self.path)
@@ -60,7 +60,7 @@ class OntheflyFrameIterator(FrameIterator):
         return frame
 
 
-class BurstFirstFrameIterator(FrameIterator):
+class BurstFrameIterator(FrameIterator):
     def __init__(self, path: str):
         super().__init__(path)
         self.burst_base_dir = os.path.join("data", "burst")
@@ -124,7 +124,7 @@ class BurstFirstFrameIterator(FrameIterator):
 
 
 class Input(object):
-    def __init__(self, path, frame_iterator=OntheflyFrameIterator):
+    def __init__(self, path, frame_iterator=VideoFrameIterator):
         self.path = path
         self.keep_in_ram = False
         self.as_list = None
@@ -226,29 +226,9 @@ class Merger(object):
         return self.merged_images / self.sum_weights.reshape(tuple(list(self.default_shape)[:-1]+[1]))
 
 
-
-
-
-
-#
-# # copy of baxter()
-# def merge_gif(file):
-#     image_name = strip_extension(file)
-#     burst_folder = os.path.join(burst_destination_folder(), image_name)
-#
-#     # note: unsorted, but we don't care about that right now.
-#     paths = glob.glob(os.path.join(burst_folder, "*.png"))
-#     m = Merger()
-#     for path in paths:
-#         m.add_to_mean(path)
-#
-#     for path in paths:
-#         m.add_to_merged(path)
-#     m.save_image(m.get_merged_image(), "out/" + image_name + ".png")
-#
 if __name__ == "__main__":
     # m = Merger()
     # burst_and_merge_gifs()
-    inpt = Input("data/giflibrary/baxter.gif", BurstFirstFrameIterator)
+    inpt = Input("data/giflibrary/baxter.gif", BurstFrameIterator)
     m = Merger(inpt)
     m.calc_merged()
