@@ -1,6 +1,9 @@
 # mac os folder metadata ... yay!:
 *.DS_store
 
+*.swp
+
+data/untracked/**
 .idea/**
 out/**
 data/burst/**
