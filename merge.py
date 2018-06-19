@@ -54,10 +54,10 @@ class Merger(object):
             intensity = 10
             metric = 1 + intensity*np.sqrt(np.sum(np.square(diff), axis=-1))
 
-            self.sum_weights += metric
-
             # blurring in space as an attemptas an attemptas an attempt to reduce noiseee
-            # metric = cv2.GaussianBlur(metric, (5,5), 0)
+            metric = cv2.GaussianBlur(metric, (5,5), 0)
+
+            self.sum_weights += metric
 
             # metric is not a width x size array. In order to multiply it to
             # the width x size x 3 array of the picture, we must broad cast it

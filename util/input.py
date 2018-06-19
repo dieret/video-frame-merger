@@ -33,6 +33,7 @@ class Input(object):
         else:
             return iter
 
+
 class FrameIterator(object):
     """ This class will be subclassed by implementing the get_frame method.
     Iterate over this class to get all frames of vide/input. """
