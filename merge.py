@@ -155,11 +155,10 @@ def merge_gif(file):
     m = Merger()
     for path in paths:
         m.add_to_mean(path)
-    m.save_image(m.mean_image, "out/mean.png")
+
     for path in paths:
         m.add_to_merged(path)
-    m.save_image(m.merged_images, "out/" + image_name + "_merged.png")
-    m.save_image(m.get_merged_image(), "out/" + image_name + "_merged-normed.png")
+    m.save_image(m.get_merged_image(), "out/" + image_name + ".png")
     
 
 def baxter():
