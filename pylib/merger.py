@@ -208,7 +208,7 @@ class SimpleMeanCutoffMerger(CutoffMerger):
             return
 
 
-class PatchedMeanCutoffMerger(SimpleMerger):
+class PatchedMeanCutoffMerger(CutoffMerger):
 
     def __init__(self, inpt):
         super().__init__(inpt)
