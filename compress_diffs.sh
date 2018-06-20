@@ -2,8 +2,9 @@
 
 set -e
 
-for file in out/merged_*.png; do
+for file in $@; do
     echo "${file}"
     name=$(basename ${file})
-    convert -quality 90 -resize 20% "${file}" "out/lq_${name}"
+    dirpath=$(dirname ${file})
+    convert -quality 90 -resize 20% "${file}" "${dirpath}/lq_${name}"
 done

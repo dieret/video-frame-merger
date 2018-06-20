@@ -2,4 +2,4 @@
 
 set -e
 
-convert out/lq_merged_???.png out/animated.gif
+convert $@ $(dirname $1)/animated.gif
