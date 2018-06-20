@@ -9,15 +9,11 @@ import cv2
 
 class Merger(object):
     """ This class overlays frames and produces an output image. """
-    def __init__(self, inpt, name=None):
+    def __init__(self, inpt):
 
         self._input = inpt
 
-        self.name = name
-        if not self.name:
-            self.name = os.path.splitext(os.path.basename(inpt.path))[0]
-
-        self.output_dir = os.path.join("out", self.name)
+        self.name = os.path.splitext(os.path.basename(inpt.path))[0]
 
         self.image_format = "png"
 
@@ -30,6 +26,10 @@ class Merger(object):
         self._shape_rgb = inpt.shape  # height x width x 3
         self._shape_scalar = (self._shape_rgb[0], self._shape_rgb[1], 1)
         self._shape = (self._shape_rgb[0], self._shape_rgb[1])
+
+    @property
+    def output_dir(self):
+        return os.path.join("out", self.name)
 
     def run(self):
         raise NotImplementedError

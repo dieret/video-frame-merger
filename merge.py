@@ -48,7 +48,14 @@ if __name__ == "__main__":
         choices=util.get_all_subclasses_names(merger.Merger)
     )
 
-    # todo: implement merger.save
+    parser.add_argument(
+        "-p",
+        "--parameter",
+        type=str,
+        nargs="+",
+        help="Set parameters of your merger. Give strings like "
+             "<param_name>=<param_value>."
+    )
 
     args = parser.parse_args()
 
@@ -57,7 +64,18 @@ if __name__ == "__main__":
         args.input_path = args.input_path[0]
 
     inpt = input.Input(args.input_path, getattr(input, args.iterator))
-    m = getattr(merger, args.merger)(inpt, name=args.name)
+    m = getattr(merger, args.merger)(inpt)
     m.save = args.save
+
+    if args.name:
+        m.name = args.name
+
+    for param_value_pair in args.parameter:
+        assert(param_value_pair.count("=") == 1)
+        key, value = param_value_pair.split("=")
+        key = key.strip()
+        value = value.strip()
+        m._logger.debug("Setting key '{}' to value '{}'='{}'".format(key, value, eval(value)))
+        setattr(m, key, eval(value))
 
     m.run()
