@@ -5,6 +5,7 @@ import numpy as np
 import os.path
 import os
 import cv2
+import collections
 
 
 class Merger(object):
@@ -12,86 +13,14 @@ class Merger(object):
     def __init__(self, inpt):
 
         self.input = inpt
+        self.logger = log.setup_logger("Merger")
 
-        self.logger = log.setup_logger("merger")
+        # For convenience:
+        self.shape_rgb = inpt.shape # height x width x 3
+        self.shape_scalar = (self.shape_rgb[0], self.shape_rgb[1], 1)
 
-        self.merged_image_sum = None
-        self.merged_image = None
-        self.mean_image = None
-
-        self.sum_weights = None
-
-        self.save_mean = True
-        self.save_diff = False
-        self.save_metric = False
-        self.save_merged_progress = False
-
-    def calc_mean(self):
-        self.logger.debug("Calculating mean.")
-        self.mean_image = self._calc_mean()
-        if self.save_mean:
-            self.save_image(self.mean_image, "out/mean.png")
-
-    def _calc_mean(self):
-        return sum(self.input.get_frames()) / self.input.number_images
-
-    def calc_diff(self, frame, index):
-        diff = self._calc_diff(frame)
-        if self.save_diff:
-            self.save_image(diff, os.path.join("out", "diff_{:03}.png".format(index)))
-        return diff
-
-    def _calc_diff(self, frame):
-        if self.mean_image is None:
-            self.calc_mean()
-        return self.mean_image - frame
-
-    def calc_metric(self, diff, index):
-        metric = self._calc_metric(diff)
-        if self.save_metric:
-            metric_normed = metric / metric.max() * 255
-            metric_normed = metric_normed.reshape((self.input.shape[0], self.input.shape[1], 1))
-            metric_grayscale = np.concatenate((metric_normed, metric_normed, metric_normed), 2)
-            self.save_image(metric_grayscale, os.path.join("out", "metric_{:03}.png".format(index)))
-        return metric
-
-    def _calc_metric(self, diff):
-        # change intensity to increase emphasis of outliers
-        intensity = 500
-        metric = 1 + intensity * np.sqrt(np.sum(np.square(diff/255), axis=-1))
-        metric = cv2.GaussianBlur(metric, (5, 5), 0)
-        return metric
-
-    def merge_frame(self, frame, index):
-        diff = self.calc_diff(frame, index)
-
-        metric = self.calc_metric(diff, index)
-
-        self.sum_weights += metric
-
-        metric = metric.reshape((self.input.shape[0], self.input.shape[1], 1))
-
-        weighted_frame = frame * metric
-        self.merged_image_sum += weighted_frame
-
-        if self.save_merged_progress:
-            self.merged_image = self.merged_image_sum / self.sum_weights.reshape((self.input.shape[0], self.input.shape[1], 1))
-            self.save_image(self.merged_image, "out/merged_{:03}.png".format(index))
-
-    def merge_all(self):
-
-        self.logger.debug("Calculating merged.")
-
-        self.sum_weights = np.ndarray(shape=(self.input.shape[0], self.input.shape[1]),
-                                      dtype=np.float)
-        self.merged_image_sum = np.ndarray(shape=self.input.shape, dtype=np.float)
-
-        index = 0
-        for frame in self.input.get_frames():
-            self.merge_frame(frame, index)
-            index += 1
-
-        self.merged_image = self.merged_image_sum / self.sum_weights.reshape((self.input.shape[0], self.input.shape[1], 1))
+    def run(self):
+        raise NotImplementedError
 
     @staticmethod
     def show_image(image):
@@ -99,6 +28,9 @@ class Merger(object):
         cv2.waitKey(0)
         cv2.destroyAllWindows()
 
+    # todo: more configuration, best have input name and folder as class variables
+    # then only let it take mean/final/etc. and maybe a frame number as optional argument
+    # but determine the rest yourself
     def save_image(self, image, path=os.path.join("out", "out.png"), quiet=False):
         _dir = os.path.dirname(path)
         if _dir and not os.path.isdir(_dir):
@@ -112,89 +44,189 @@ class Merger(object):
         cv2.imwrite(path, image)
         return True
 
-
-class DefaultMerger(Merger):
-    pass
-
-
-class CutoffMerger(Merger):
-
-    # def _calc_mean(self):
-    #     for frame in self.input.get_frames():
-    #         return frame
-
-    def _calc_metric(self, diff):
-        metric = np.sqrt(np.sum(np.square(diff/255), axis=-1))
-        metric = cv2.GaussianBlur(metric, (5, 5), 3)
-        metric = np.piecewise(metric, [metric < 0.1, metric >= 0.1], [0.1/self.input.number_images, 1])
-        return metric
+    @staticmethod
+    def scalar_to_grayscale(scalar):
+        normed = scalar / scalar.max() * 255
+        return np.concatenate((normed, normed, normed), 2)
 
 
-class PatchedMeanCutoffMerger(CutoffMerger):
+class SimpleMerger(Merger):
+    def __init__(self, inpt, fifo_length=1):
+        super().__init__(inpt)
+
+        # Progress images to save
+        # mean, diff, metric, merge, final
+        self.save = ["final"]
+
+        # these values will be continuously updated in the self.run loop
+        # This will allow us more flexibility than using parameters for the
+        # class functions.
+        self.index = 0
+        self.frame = None
+        self.mean = None
+        self.diff = None
+        self.metric = None
+        self.final = None
+
+        self.sum_metric = np.zeros(shape=self.shape_scalar, dtype=float)
+        self.sum_layers = np.zeros(shape=self.shape_rgb, dtype=float)
+
+    def calc_mean(self):
+        self.mean = sum(self.input.get_frames()) / self.input.number_images
+
+    def calc_diff(self):
+        self.diff =  self.mean - self.frame
+
+    def calc_metric(self):
+        # change intensity to increase emphasis of outliers
+        intensity = 500
+        metric = 1 + intensity * np.sqrt(np.sum(np.square(self.diff/255), axis=-1))
+        metric = cv2.GaussianBlur(metric, (5, 5), 0)
+        self.metric = metric.reshape(self.shape_scalar)
+
+    def calc_sum_metric(self):
+        self.sum_metric += self.metric
+
+    def calc_sum_layers(self):
+        self.sum_layers += self.frame * self.metric
+
+    def calc_final(self):
+        self.final = self.sum_layers / self.sum_metric
+
+    def run(self):
+
+        self.logger.debug("Run!")
+
+        mean = self.calc_mean()
+        if "mean" in self.save:
+            self.save_image(mean, "out/mean.png")
+
+        for self.index, self.frame in enumerate(self.input.get_frames()):
+            self.calc_diff()
+            self.calc_metric()
+            self.calc_sum_metric()
+            self.calc_sum_layers()
+
+            if "diff" in self.save:
+                self.save_image(
+                    self.diff,
+                    os.path.join("out", "diff_{:03}.png".format(self.index)))
+            if "metric" in self.save:
+                self.save_image(
+                    self.scalar_to_grayscale(self.metric),
+                    os.path.join("out", "metric_{:03}.png".format(self.index)))
+            if "merge" in self.save:
+                self.calc_final()
+                self.save_image(
+                    self.final,
+                    os.path.join("out", "merge_{:03}.png".format(self.index)))
+
+        self.calc_final()
+        if "final" in self.save:
+            self.save_image(
+                self.final,
+                os.path.join("out", "out.png"))
+
+
+class SimpleMeanMerger(SimpleMerger):
 
     def __init__(self, inpt):
         super().__init__(inpt)
-        self.save_metric = True
-        self.save_merged_progress = True
 
-    def _calc_mean(self):
-        # for frame in self.input.get_frames():
-        #     self.mean_image = frame
-        #     break
+    def calc_mean(self):
+        for frame in self.input.get_frames():
+            self.mean = frame
+            return
+
+# class FifoMerger(object):
+#     """ This class overlays frames and produces an output image. """
+#     def __init__(self, inpt, fifo_length=1):
+#
+#         self.input = inpt
+#
+#         # height x width x 3
+#         self.shape_rgb = inpt.shape
+#         # height x width x 1
+#         self.shape_scalar = (self.shape_rgb[0], self.shape_rgb[1], 1)
+#
+#         self.logger = log.setup_logger("merger")
+#
+#         # currently processed frame
+#         self.frame_no = 0
+#
+#         # FIFOs = First in first out: Keep copies of the last n frames
+#         self.fifo_frame = collections.deque(maxlen=fifo_length)
+#         self.fifo_mean = collections.deque(maxlen=fifo_length)
+#         self.fifo_diff = collections.deque(maxlen=fifo_length)
+#         self.fifo_metric = collections.deque(maxlen=fifo_length)
+#         self.fifo_merged = collections.deque(maxlen=fifo_length)
+#
+#
+#         # Sums
+#         self.sum_metric = np.zeros(self.shape_scalar)
+#         self.sum_layers = np.zeros(self.shape_scalar)
+#
+#         # Config
+#         self.save_diff = False
+#         self.save_mean = True
+#         self.save_metric = False
+
+
+
+class CutoffMerger(SimpleMerger):
+
+    def __init__(self, inpt):
+        super().__init__(inpt)
+
+    def calc_metric(self):
+        metric = np.sqrt(np.sum(np.square(self.diff/255), axis=-1))
+        metric = cv2.GaussianBlur(metric, (5, 5), 1)
+        metric = np.piecewise(metric, [metric < 0.1, metric >= 0.1], [0.1/self.input.number_images, 1])
+        self.metric = metric.reshape(self.shape_scalar)
+
+
+class SimpleMeanCutoffMerger(CutoffMerger):
+
+    def __init__(self, inpt):
+        super().__init__(inpt)
+
+    def calc_mean(self):
+        for frame in self.input.get_frames():
+             self.mean_image = frame
+             return
+
+
+class PatchedMeanCutoffMerger(SimpleMerger):
+
+    def __init__(self, inpt):
+        super().__init__(inpt)
+
+    def calc_mean(self):
         width = self.input.shape[1]
         width_left = int(width/2)
         left = self.input.get_frame(-1)[:, :width_left, :]
         right = self.input.get_frame(0)[:, width_left:, :]
-        mean = np.concatenate((left, right), axis = 1)
-        return mean
+        self.mean = np.concatenate((left, right), axis = 1)
 
 
-class CutoffOverlayMerger(CutoffMerger):
+class OverlayMerger(PatchedMeanCutoffMerger):
 
     def __init__(self, inpt):
         super().__init__(inpt)
-        self.save_merged_progress = False
-        self.save_diff = True
+        self.save.append("merge")
 
-    def merge_frame(self, frame, index):
-        diff = self.calc_diff(frame, index)
-        metric = self.calc_metric(diff, index)
-
-        # self.sum_weights += metric
-
-        metric = metric.reshape((self.input.shape[0], self.input.shape[1], 1))
-
-        if index == 0:
-            self.merged_image_sum = frame
-            self.sum_weights = np.ones(shape=(self.input.shape[0], self.input.shape[1], 1))
-        else:
-            self.merged_image_sum = self.merged_image_sum * (1-metric) + frame * metric
-
-        if self.save_merged_progress:
-            self.merged_image = self.merged_image_sum #/ self.sum_weights.reshape((self.input.shape[0], self.input.shape[1], 1))
-            self.save_image(self.merged_image, "out/merged_{:03}.png".format(index))
-
-    _calc_mean = PatchedMeanCutoffMerger._calc_mean
-
-
-class CutOffImages(Merger):
-
-    def _calc_mean(self):
-        mean = None
-        for frame in self.input.get_frames():
-            mean = frame
-            break
-        return mean
-
-    def _calc_metric(self, diff):
-        metric = np.sqrt(np.sum(np.square(diff/255), axis=-1))
+    def calc_metric(self):
+        # difference to PatchedMeanCutoffMerger: Take 0, not just small value
+        metric = np.sqrt(np.sum(np.square(self.diff/255), axis=-1))
         metric = cv2.GaussianBlur(metric, (5, 5), 1)
         metric = np.piecewise(metric, [metric < 0.1, metric >= 0.1], [0, 1])
-        return metric
+        self.metric = metric.reshape(self.shape_scalar)
 
-    def merge_frame(self, frame, index):
-        diff = self.calc_diff(frame, index)
-        metric = self.calc_metric(diff, index)
-        metric = metric.reshape((self.input.shape[0], self.input.shape[1], 1))
-        self.save_image(frame*metric, os.path.join("out", "diff_{:03}.png".format(index)))
+    def calc_sum_layers(self):
+        if self.index == 0:
+            self.sum_layers = self.frame
+        else:
+            self.sum_layers = (1-self.metric) * self.sum_layers + self.metric * self.frame
 
+    def calc_final(self):
+        self.final = self.sum_layers
