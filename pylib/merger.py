@@ -26,6 +26,7 @@ class Merger(object):
         # For convenience:
         self._shape_rgb = inpt.shape  # height x width x 3
         self._shape_scalar = (self._shape_rgb[0], self._shape_rgb[1], 1)
+        self._shape = (self._shape_rgb[0], self._shape_rgb[1])
 
     def run(self):
         raise NotImplementedError
@@ -186,10 +187,12 @@ class CutoffMerger(SimpleMerger):
         self.metric_threshold = 0.1
         self.metric_min = 0.1 / self._input.number_images
         self.metric_max = 1
+        self.metric_blur_shape = (5, 5)
+        self.metric_blur_sigma = 0
 
     def calc_metric(self):
         metric = np.sqrt(np.sum(np.square(self.diff/255), axis=-1))
-        metric = cv2.GaussianBlur(metric, (5, 5), 1)
+        metric = cv2.GaussianBlur(metric, self.metric_blur_shape, self.metric_blur_sigma)
         metric = np.piecewise(
             metric,
             [metric < self.metric_threshold, metric >= self.metric_threshold],
@@ -212,6 +215,7 @@ class PatchedMeanCutoffMerger(CutoffMerger):
 
     def __init__(self, inpt):
         super().__init__(inpt)
+        self.save.extend(["diff", "metric", "merge"])
 
     def calc_mean(self):
         width = self._input.shape[1]
@@ -243,7 +247,7 @@ class RunningDifferenceMerger(SimpleMeanCutoffMerger):
     def __init__(self, inpt):
         super().__init__(inpt)
         self.save.extend(["diff", "metric", "merge"])
-        self.metric_threshold = 0.3
+        self.metric_threshold = 0.05
 
     def calc_diff(self):
         super().calc_diff()
@@ -252,6 +256,24 @@ class RunningDifferenceMerger(SimpleMeanCutoffMerger):
     def calc_sum_layers(self):
         super().calc_sum_layers()
         self.mean = self.frame
+
+
+class EdgeDetection(PatchedMeanCutoffMerger):
+
+    def __init__(self, inpt):
+        super().__init__(inpt)
+        self.save.extend(["diff", "metric", "merge"])
+        self.metric_min = 0
+        self.metric_blur_shape = (11, 11)
+        self.metric_blur_sigma = 5
+
+    def calc_metric(self):
+        super().calc_metric()
+        gray = self.metric * 255
+        gray = gray.reshape(self._shape).astype(np.uint8)
+        edges = cv2.Canny(gray, 100, 200)
+        edges = edges.reshape(self._shape_scalar).astype(np.float)
+        self.metric = edges
 
 
 # class FifoMerger(object):
