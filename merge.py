@@ -4,6 +4,7 @@ import os
 import argparse
 import pylib.input as input
 import pylib.merger as merger
+import pylib.util as util
 
 
 if __name__ == "__main__":
@@ -18,33 +19,36 @@ if __name__ == "__main__":
         "-i",
         "--iterator",
         default="VideoFrameIterator",
-        help="Frame iterator. Currently 3 options: "
-             "VideoFrameIterator, SinglFramesIterator, "
-             "BurstFrameIterator.")
+        help="Frame iterator. Default: VideoFrameIterator",
+        choices=util.get_all_subclasses_names(input.FrameIterator))
 
-    # todo: implement
     parser.add_argument(
-        "-o",
-        "--output",
-        default=os.path.join("out", "out.png"),
-        help="Output path."
+        "-n",
+        "--name",
+        default=None,
+        help="Name (will e.g. become output folder name)"
     )
 
-    # todo: implement
     parser.add_argument(
         "-s",
-        "--show",
-        action="store_true",
-        default=False,
-        help="Show final picture."
+        "--save",
+        type=str,
+        nargs="+",
+        default=["final"],
+        choices=["mean", "diff", "metric", "merge", "final"],
+        help="Which steps to save."
     )
 
     parser.add_argument(
         "-m",
         "--merger",
         default="SimpleMerger",
-        help="Merger. This is what actually merges all frames."
+        help="Merger. This is what actually merges all frames. "
+             "Default: SimpleMerger.",
+        choices=util.get_all_subclasses_names(merger.Merger)
     )
+
+    # todo: implement merger.save
 
     args = parser.parse_args()
 
@@ -53,5 +57,7 @@ if __name__ == "__main__":
         args.input_path = args.input_path[0]
 
     inpt = input.Input(args.input_path, getattr(input, args.iterator))
-    m = getattr(merger, args.merger)(inpt)
+    m = getattr(merger, args.merger)(inpt, name=args.name)
+    m.save = args.save
+
     m.run()

@@ -23,6 +23,9 @@ class Merger(object):
 
         self._logger = log.setup_logger("Merger")
 
+        # which steps should be saved
+        self.save = []
+
         # For convenience:
         self._shape_rgb = inpt.shape  # height x width x 3
         self._shape_scalar = (self._shape_rgb[0], self._shape_rgb[1], 1)
@@ -215,7 +218,6 @@ class PatchedMeanCutoffMerger(CutoffMerger):
 
     def __init__(self, inpt):
         super().__init__(inpt)
-        self.save.extend(["diff", "metric", "merge"])
 
     def calc_mean(self):
         width = self._input.shape[1]
@@ -230,7 +232,6 @@ class OverlayMerger(PatchedMeanCutoffMerger):
     def __init__(self, inpt):
         super().__init__(inpt)
         self.metric_min = 0
-        self.save.append("merge")
 
     def calc_sum_layers(self):
         if self.index == 0:
@@ -246,7 +247,6 @@ class RunningDifferenceMerger(SimpleMeanCutoffMerger):
 
     def __init__(self, inpt):
         super().__init__(inpt)
-        self.save.extend(["diff", "metric", "merge"])
         self.metric_threshold = 0.05
 
     def calc_diff(self):
@@ -262,7 +262,6 @@ class EdgeDetectionMerger(PatchedMeanCutoffMerger):
 
     def __init__(self, inpt):
         super().__init__(inpt)
-        self.save.extend(["diff", "metric", "merge"])
         self.metric_min = 0
         self.metric_blur_shape = (11, 11)
         self.metric_blur_sigma = 5
