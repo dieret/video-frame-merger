@@ -2,4 +2,4 @@
 
 set -e
 
-convert out/lq_*.png out/animated.gif
+convert out/lq_merged_???.png out/animated.gif

@@ -15,14 +15,16 @@ class Merger(object):
 
         self.logger = log.setup_logger("merger")
 
+        self.merged_image_sum = None
         self.merged_image = None
         self.mean_image = None
 
         self.sum_weights = None
 
-        self.save_diff = False
         self.save_mean = True
+        self.save_diff = False
         self.save_metric = False
+        self.save_merged_progress = False
 
     def calc_mean(self):
         self.logger.debug("Calculating mean.")
@@ -70,7 +72,11 @@ class Merger(object):
         metric = metric.reshape((self.input.shape[0], self.input.shape[1], 1))
 
         weighted_frame = frame * metric
-        self.merged_image += weighted_frame
+        self.merged_image_sum += weighted_frame
+
+        if self.save_merged_progress:
+            self.merged_image = self.merged_image_sum / self.sum_weights.reshape((self.input.shape[0], self.input.shape[1], 1))
+            self.save_image(self.merged_image, "out/merged_{:03}.png".format(index))
 
     def merge_all(self):
 
@@ -78,14 +84,14 @@ class Merger(object):
 
         self.sum_weights = np.ndarray(shape=(self.input.shape[0], self.input.shape[1]),
                                       dtype=np.float)
-        self.merged_image = np.ndarray(shape=self.input.shape, dtype=np.float)
+        self.merged_image_sum = np.ndarray(shape=self.input.shape, dtype=np.float)
 
         index = 0
         for frame in self.input.get_frames():
             self.merge_frame(frame, index)
             index += 1
 
-        self.merged_image = self.merged_image / self.sum_weights.reshape((self.input.shape[0], self.input.shape[1], 1))
+        self.merged_image = self.merged_image_sum / self.sum_weights.reshape((self.input.shape[0], self.input.shape[1], 1))
 
     @staticmethod
     def show_image(image):
@@ -119,7 +125,7 @@ class CutoffMerger(Merger):
 
     def _calc_metric(self, diff):
         metric = np.sqrt(np.sum(np.square(diff/255), axis=-1))
-        metric = cv2.GaussianBlur(metric, (5, 5), 1)
+        metric = cv2.GaussianBlur(metric, (5, 5), 3)
         metric = np.piecewise(metric, [metric < 0.1, metric >= 0.1], [0.1/self.input.number_images, 1])
         return metric
 
@@ -129,6 +135,7 @@ class PatchedMeanCutoffMerger(CutoffMerger):
     def __init__(self, inpt):
         super().__init__(inpt)
         self.save_metric = True
+        self.save_merged_progress = True
 
     def _calc_mean(self):
         # for frame in self.input.get_frames():
@@ -140,6 +147,34 @@ class PatchedMeanCutoffMerger(CutoffMerger):
         right = self.input.get_frame(0)[:, width_left:, :]
         mean = np.concatenate((left, right), axis = 1)
         return mean
+
+
+class CutoffOverlayMerger(CutoffMerger):
+
+    def __init__(self, inpt):
+        super().__init__(inpt)
+        self.save_merged_progress = False
+        self.save_diff = True
+
+    def merge_frame(self, frame, index):
+        diff = self.calc_diff(frame, index)
+        metric = self.calc_metric(diff, index)
+
+        # self.sum_weights += metric
+
+        metric = metric.reshape((self.input.shape[0], self.input.shape[1], 1))
+
+        if index == 0:
+            self.merged_image_sum = frame
+            self.sum_weights = np.ones(shape=(self.input.shape[0], self.input.shape[1], 1))
+        else:
+            self.merged_image_sum = self.merged_image_sum * (1-metric) + frame * metric
+
+        if self.save_merged_progress:
+            self.merged_image = self.merged_image_sum #/ self.sum_weights.reshape((self.input.shape[0], self.input.shape[1], 1))
+            self.save_image(self.merged_image, "out/merged_{:03}.png".format(index))
+
+    _calc_mean = PatchedMeanCutoffMerger._calc_mean
 
 
 class CutOffImages(Merger):
@@ -162,3 +197,49 @@ class CutOffImages(Merger):
         metric = self.calc_metric(diff, index)
         metric = metric.reshape((self.input.shape[0], self.input.shape[1], 1))
         self.save_image(frame*metric, os.path.join("out", "diff_{:03}.png".format(index)))
+
+
+class RunningDifferenceMerger(Merger):
+
+    def __init__(self, inpt):
+        super().__init__(inpt)
+
+    def merge_all(self):
+
+        self.logger.debug("Calculating merged.")
+
+        self.sum_weights = np.ndarray(shape=(self.input.shape[0], self.input.shape[1]),
+                                      dtype=np.float)
+        self.merged_image_sum = np.ndarray(shape=self.input.shape, dtype=np.float)
+
+        index = 0
+        previous_frame = None
+        for frame in self.input.get_frames():
+            if not index == 0:
+                self.merge_frame(frame, previous_frame, index)
+            previous_frame = None
+            index += 1
+
+        self.merged_image = self.merged_image_sum / self.sum_weights.reshape((self.input.shape[0], self.input.shape[1], 1))
+
+    def merge_frame(self, frame, previous_frame, index):
+        diff = self.calc_diff(frame, previous_frame, index)
+
+        metric = self.calc_metric(diff, index)
+
+        self.sum_weights += metric
+
+        metric = metric.reshape((self.input.shape[0], self.input.shape[1], 1))
+
+        weighted_frame = frame * metric
+        self.merged_image_sum += weighted_frame
+
+        if self.save_merged_progress:
+            self.merged_image = self.merged_image_sum / self.sum_weights.reshape((self.input.shape[0], self.input.shape[1], 1))
+            self.save_image(self.merged_image, "out/merged_{:03}.png".format(index))
+
+    def calc_diff(self, frame, previous_frame, index):
+        diff = frame - previous_frame
+        if self.save_diff:
+            self.save_image(diff, os.path.join("out", "diff_{:03}.png".format(index)))
+        return diff
