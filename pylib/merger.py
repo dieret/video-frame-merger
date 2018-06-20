@@ -258,7 +258,7 @@ class RunningDifferenceMerger(SimpleMeanCutoffMerger):
         self.mean = self.frame
 
 
-class EdgeDetection(PatchedMeanCutoffMerger):
+class EdgeDetectionMerger(PatchedMeanCutoffMerger):
 
     def __init__(self, inpt):
         super().__init__(inpt)
@@ -274,6 +274,16 @@ class EdgeDetection(PatchedMeanCutoffMerger):
         edges = cv2.Canny(gray, 100, 200)
         edges = edges.reshape(self._shape_scalar).astype(np.float)
         self.metric = edges
+
+    def calc_sum_layers(self):
+        if self.index == 0:
+            # todo: if I use self.mean here, something really funny happens. Why?
+            self.sum_layers = self.frame
+        else:
+            self.sum_layers += self.metric
+
+    def calc_final(self):
+        self.final = self.sum_layers
 
 
 # class FifoMerger(object):
