@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 
-import os
 import argparse
-import pylib.input as input
+import pylib.inputdata as inputdata
 import pylib.merger as merger
 import pylib.util as util
 
@@ -14,13 +13,13 @@ if __name__ == "__main__":
         dest="input_path",
         type=str,
         nargs="+",
-        help="Input video file")
+        help="InputData video file")
     parser.add_argument(
         "-i",
         "--iterator",
         default="VideoFrameIterator",
         help="Frame iterator. Default: VideoFrameIterator",
-        choices=util.get_all_subclasses_names(input.FrameIterator))
+        choices=util.get_all_subclasses_names(inputdata.FrameIterator))
 
     parser.add_argument(
         "-n",
@@ -28,7 +27,6 @@ if __name__ == "__main__":
         default=None,
         help="Name (will e.g. become output folder name)"
     )
-
     parser.add_argument(
         "-s",
         "--save",
@@ -38,7 +36,6 @@ if __name__ == "__main__":
         choices=["mean", "diff", "metric", "merge", "final"],
         help="Which steps to save."
     )
-
     parser.add_argument(
         "-m",
         "--merger",
@@ -47,7 +44,6 @@ if __name__ == "__main__":
              "Default: SimpleMerger.",
         choices=util.get_all_subclasses_names(merger.Merger)
     )
-
     parser.add_argument(
         "-p",
         "--parameter",
@@ -63,8 +59,8 @@ if __name__ == "__main__":
         assert(len(args.input_path)) == 1
         args.input_path = args.input_path[0]
 
-    inpt = input.Input(args.input_path, getattr(input, args.iterator))
-    m = getattr(merger, args.merger)(inpt)
+    i = inputdata.InputData(args.input_path, getattr(inputdata, args.iterator))
+    m = getattr(merger, args.merger)(i)
     m.save = args.save
 
     if args.name:
@@ -75,7 +71,8 @@ if __name__ == "__main__":
         key, value = param_value_pair.split("=")
         key = key.strip()
         value = value.strip()
-        m._logger.debug("Setting key '{}' to value '{}'='{}'".format(key, value, eval(value)))
+        m._logger.debug("Setting key '{}' to value '{}'='{}'".format(
+            key, value, eval(value)))
         setattr(m, key, eval(value))
 
     m.run()

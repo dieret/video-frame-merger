@@ -8,7 +8,7 @@ import os.path
 import numpy as np
 
 
-class Input(object):
+class InputData(object):
     """ This class decides which FrameIterator class to take and also can
     load all images into ram. """
     def __init__(self, path, frame_iterator):
@@ -16,7 +16,7 @@ class Input(object):
         self.keep_in_ram = False # I'd be really careful with that one
         self._as_list = None
         self._frame_iterator = frame_iterator(self.path)
-        self.logger = log.setup_logger("Input")
+        self.logger = log.setup_logger("InputData")
 
     def get_frames(self):
         if self.keep_in_ram and self._as_list:

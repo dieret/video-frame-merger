@@ -81,7 +81,7 @@ class SimpleMerger(Merger):
 
     def __init__(self, inpt):
         """ Initialize
-        :param inpt: Input object (from pylib/input)
+        :param inpt: InputData object (from pylib/input)
         """
         super().__init__(inpt)
 
@@ -126,6 +126,12 @@ class SimpleMerger(Merger):
     def calc_final(self):
         self.final = self.sum_layers / self.sum_metric
 
+    def calc_all(self):
+        self.calc_diff()
+        self.calc_metric()
+        self.calc_sum_metric()
+        self.calc_sum_layers()
+
     def run(self):
         self._logger.debug("Run!")
 
@@ -134,10 +140,7 @@ class SimpleMerger(Merger):
             self.save_image(mean, "mean")
 
         for self.index, self.frame in enumerate(self._input.get_frames()):
-            self.calc_diff()
-            self.calc_metric()
-            self.calc_sum_metric()
-            self.calc_sum_layers()
+            self.calc_all()
 
             if "diff" in self.save:
                 self.save_image(self.diff, "diff", self.index)
@@ -237,7 +240,8 @@ class OverlayMerger(PatchedMeanCutoffMerger):
         if self.index == 0:
             self.sum_layers = self.frame
         else:
-            self.sum_layers = (1-self.metric) * self.sum_layers + self.metric * self.frame
+            self.sum_layers = (1-self.metric) * self.sum_layers + \
+                              self.metric * self.frame
 
     def calc_final(self):
         self.final = self.sum_layers
@@ -253,8 +257,8 @@ class RunningDifferenceMerger(SimpleMeanCutoffMerger):
         super().calc_diff()
         self.diff[self.diff < 0] = 0
 
-    def calc_sum_layers(self):
-        super().calc_sum_layers()
+    def calc_all(self):
+        super().calc_all()
         self.mean = self.frame
 
 
