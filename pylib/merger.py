@@ -10,14 +10,23 @@ import collections
 
 class Merger(object):
     """ This class overlays frames and produces an output image. """
-    def __init__(self, inpt):
+    def __init__(self, inpt, name=None):
 
-        self.input = inpt
-        self.logger = log.setup_logger("Merger")
+        self._input = inpt
+
+        self.name = name
+        if not self.name:
+            self.name = os.path.splitext(os.path.basename(inpt.path))[0]
+
+        self.output_dir = os.path.join("out", self.name)
+
+        self.image_format = "png"
+
+        self._logger = log.setup_logger("Merger")
 
         # For convenience:
-        self.shape_rgb = inpt.shape # height x width x 3
-        self.shape_scalar = (self.shape_rgb[0], self.shape_rgb[1], 1)
+        self._shape_rgb = inpt.shape # height x width x 3
+        self._shape_scalar = (self._shape_rgb[0], self._shape_rgb[1], 1)
 
     def run(self):
         raise NotImplementedError
@@ -28,19 +37,26 @@ class Merger(object):
         cv2.waitKey(0)
         cv2.destroyAllWindows()
 
-    # todo: more configuration, best have input name and folder as class variables
-    # then only let it take mean/final/etc. and maybe a frame number as optional argument
-    # but determine the rest yourself
-    def save_image(self, image, path=os.path.join("out", "out.png"), quiet=False):
+    def save_image(self, image, prefix="", frame_no=None):
+        filename = prefix
+        if frame_no:
+            filename += "_{:04}".format(frame_no)
+        if not filename:
+            filename = "out"
+        filename += ".{}".format(self.image_format)
+        path = os.path.join(self.output_dir, filename)
+
         _dir = os.path.dirname(path)
         if _dir and not os.path.isdir(_dir):
+            self._logger.info("Creating dir '{}'.".format(_dir))
             try:
-                os.mkdir(_dir)
+                os.makedirs(_dir)
             except:
-                self.logger.error("Could not create director '{}'!".format(_dir))
-                return False
-        if not quiet:
-            self.logger.info("Writing to '{}'.".format(path))
+                self._logger.error("Could not create director '{}'!".format(_dir))
+                raise
+
+        self._logger.info("Writing to '{}'.".format(path))
+
         cv2.imwrite(path, image)
         return True
 
@@ -68,11 +84,11 @@ class SimpleMerger(Merger):
         self.metric = None
         self.final = None
 
-        self.sum_metric = np.zeros(shape=self.shape_scalar, dtype=float)
-        self.sum_layers = np.zeros(shape=self.shape_rgb, dtype=float)
+        self.sum_metric = np.zeros(shape=self._shape_scalar, dtype=float)
+        self.sum_layers = np.zeros(shape=self._shape_rgb, dtype=float)
 
     def calc_mean(self):
-        self.mean = sum(self.input.get_frames()) / self.input.number_images
+        self.mean = sum(self._input.get_frames()) / self._input.number_images
 
     def calc_diff(self):
         self.diff =  self.mean - self.frame
@@ -82,7 +98,7 @@ class SimpleMerger(Merger):
         intensity = 500
         metric = 1 + intensity * np.sqrt(np.sum(np.square(self.diff/255), axis=-1))
         metric = cv2.GaussianBlur(metric, (5, 5), 0)
-        self.metric = metric.reshape(self.shape_scalar)
+        self.metric = metric.reshape(self._shape_scalar)
 
     def calc_sum_metric(self):
         self.sum_metric += self.metric
@@ -95,37 +111,31 @@ class SimpleMerger(Merger):
 
     def run(self):
 
-        self.logger.debug("Run!")
+        self._logger.debug("Run!")
 
         mean = self.calc_mean()
         if "mean" in self.save:
-            self.save_image(mean, "out/mean.png")
+            self.save_image(mean, "mean")
 
-        for self.index, self.frame in enumerate(self.input.get_frames()):
+        for self.index, self.frame in enumerate(self._input.get_frames()):
             self.calc_diff()
             self.calc_metric()
             self.calc_sum_metric()
             self.calc_sum_layers()
 
             if "diff" in self.save:
-                self.save_image(
-                    self.diff,
-                    os.path.join("out", "diff_{:03}.png".format(self.index)))
+                self.save_image(self.diff, "diff", self.index)
             if "metric" in self.save:
-                self.save_image(
-                    self.scalar_to_grayscale(self.metric),
-                    os.path.join("out", "metric_{:03}.png".format(self.index)))
+                self.save_image(self.scalar_to_grayscale(self.metric),
+                                "metric",
+                                self.index)
             if "merge" in self.save:
                 self.calc_final()
-                self.save_image(
-                    self.final,
-                    os.path.join("out", "merge_{:03}.png".format(self.index)))
+                self.save_image(self.final, "merge", self.index)
 
         self.calc_final()
         if "final" in self.save:
-            self.save_image(
-                self.final,
-                os.path.join("out", "out.png"))
+            self.save_image(self.final, "final")
 
 
 class SimpleMeanMerger(SimpleMerger):
@@ -134,7 +144,7 @@ class SimpleMeanMerger(SimpleMerger):
         super().__init__(inpt)
 
     def calc_mean(self):
-        for frame in self.input.get_frames():
+        for frame in self._input.get_frames():
             self.mean = frame
             return
 
@@ -181,8 +191,8 @@ class CutoffMerger(SimpleMerger):
     def calc_metric(self):
         metric = np.sqrt(np.sum(np.square(self.diff/255), axis=-1))
         metric = cv2.GaussianBlur(metric, (5, 5), 1)
-        metric = np.piecewise(metric, [metric < 0.1, metric >= 0.1], [0.1/self.input.number_images, 1])
-        self.metric = metric.reshape(self.shape_scalar)
+        metric = np.piecewise(metric, [metric < 0.1, metric >= 0.1], [0.1 / self._input.number_images, 1])
+        self.metric = metric.reshape(self._shape_scalar)
 
 
 class SimpleMeanCutoffMerger(CutoffMerger):
@@ -191,7 +201,7 @@ class SimpleMeanCutoffMerger(CutoffMerger):
         super().__init__(inpt)
 
     def calc_mean(self):
-        for frame in self.input.get_frames():
+        for frame in self._input.get_frames():
              self.mean_image = frame
              return
 
@@ -202,10 +212,10 @@ class PatchedMeanCutoffMerger(SimpleMerger):
         super().__init__(inpt)
 
     def calc_mean(self):
-        width = self.input.shape[1]
+        width = self._input.shape[1]
         width_left = int(width/2)
-        left = self.input.get_frame(-1)[:, :width_left, :]
-        right = self.input.get_frame(0)[:, width_left:, :]
+        left = self._input.get_frame(-1)[:, :width_left, :]
+        right = self._input.get_frame(0)[:, width_left:, :]
         self.mean = np.concatenate((left, right), axis = 1)
 
 
@@ -220,7 +230,7 @@ class OverlayMerger(PatchedMeanCutoffMerger):
         metric = np.sqrt(np.sum(np.square(self.diff/255), axis=-1))
         metric = cv2.GaussianBlur(metric, (5, 5), 1)
         metric = np.piecewise(metric, [metric < 0.1, metric >= 0.1], [0, 1])
-        self.metric = metric.reshape(self.shape_scalar)
+        self.metric = metric.reshape(self._shape_scalar)
 
     def calc_sum_layers(self):
         if self.index == 0:
