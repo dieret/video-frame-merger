@@ -56,6 +56,9 @@ class SimpleMerger(Merger):
         # mean, diff, metric, merge, final
         self.save = ["final"]
 
+        # these values will be continuously updated in the self.run loop
+        # This will allow us more flexibility than using parameters for the
+        # class functions.
         self.index = 0
         self.frame = None
         self.mean = None
@@ -64,7 +67,7 @@ class SimpleMerger(Merger):
         self.final = None
 
         self.sum_metric = np.zeros(shape=self.shape_scalar, dtype=float)
-        self.sum_layers = np.zeros(shape=self.shape_scalar, dtype=float)
+        self.sum_layers = np.zeros(shape=self.shape_rgb, dtype=float)
 
     def calc_mean(self):
         self.mean = sum(self.input.get_frames()) / self.input.number_images
@@ -77,14 +80,13 @@ class SimpleMerger(Merger):
         intensity = 500
         metric = 1 + intensity * np.sqrt(np.sum(np.square(self.diff/255), axis=-1))
         metric = cv2.GaussianBlur(metric, (5, 5), 0)
-        self.metric = metric
+        self.metric = metric.reshape(self.shape_scalar)
 
     def calc_sum_metric(self):
         self.sum_metric += self.metric
 
     def calc_sum_layers(self):
-        layer = self.frame * self.metric
-        self.sum_layers += self.layer
+        self.sum_layers += self.frame * self.metric
 
     def calc_final(self):
         self.final = self.sum_layers / self.sum_metric
@@ -112,15 +114,27 @@ class SimpleMerger(Merger):
                     self.scalar_to_grayscale(self.metric),
                     os.path.join("out", "metric_{:03}.png".format(self.index)))
             if "merge" in self.save:
+                self.calc_final()
                 self.save_image(
                     self.final,
                     os.path.join("out", "merge_{:03}.png".format(self.index)))
 
+        self.calc_final()
         if "final" in self.save:
             self.save_image(
                 self.final,
                 os.path.join("out", "out.png"))
 
+
+class SimpleMeanMerger(SimpleMerger):
+
+    def __init__(self, inpt):
+        super().__init__(inpt)
+
+    def calc_mean(self):
+        for frame in self.input.get_frames():
+            self.mean = frame
+            return
 
 # class FifoMerger(object):
 #     """ This class overlays frames and produces an output image. """
@@ -162,11 +176,11 @@ class CutoffMerger(SimpleMerger):
     def __init__(self, inpt):
         super().__init__(inpt)
 
-    def calc_metric(self, diff):
-        metric = np.sqrt(np.sum(np.square(diff/255), axis=-1))
+    def calc_metric(self):
+        metric = np.sqrt(np.sum(np.square(self.diff/255), axis=-1))
         metric = cv2.GaussianBlur(metric, (5, 5), 1)
         metric = np.piecewise(metric, [metric < 0.1, metric >= 0.1], [0.1/self.input.number_images, 1])
-        return metric
+        self.metric = metric.reshape(self.shape_scalar)
 
 
 class SimpleMeanCutoffMerger(CutoffMerger):
@@ -177,7 +191,7 @@ class SimpleMeanCutoffMerger(CutoffMerger):
     def calc_mean(self):
         for frame in self.input.get_frames():
              self.mean_image = frame
-             break
+             return
 
 
 class PatchedMeanCutoffMerger(SimpleMerger):
@@ -190,25 +204,24 @@ class PatchedMeanCutoffMerger(SimpleMerger):
         width_left = int(width/2)
         left = self.input.get_frame(-1)[:, :width_left, :]
         right = self.input.get_frame(0)[:, width_left:, :]
-        mean = np.concatenate((left, right), axis = 1)
-        return mean
+        self.mean = np.concatenate((left, right), axis = 1)
 
 
-class OverlayMerger(SimpleMerger):
-
-    def __init__(self, inpt):
-        super().__init__(inpt)
-
-    def calc_mean(self):
-        for frame in self.input.get_frames():
-            return frame
-
-    def calc_metric(self, diff):
-        metric = np.sqrt(np.sum(np.square(diff/255), axis=-1))
-        metric = cv2.GaussianBlur(metric, (5, 5), 1)
-        metric = np.piecewise(metric, [metric < 0.1, metric >= 0.1], [0, 1])
-        return metric
-
-    def merge_frame(self, frame, index):
-        diff = self.calc_diff(frame, index)
-        metric = self.calc_metric(diff, index)
+# class OverlayMerger(SimpleMerger):
+#
+#     def __init__(self, inpt):
+#         super().__init__(inpt)
+#
+#     def calc_mean(self):
+#         for frame in self.input.get_frames():
+#             return frame
+#
+#     def calc_metric(self):
+#         metric = np.sqrt(np.sum(np.square(self.diff/255), axis=-1))
+#         metric = cv2.GaussianBlur(metric, (5, 5), 1)
+#         metric = np.piecewise(metric, [metric < 0.1, metric >= 0.1], [0, 1])
+#         return metric
+#
+#     def merge_frame(self, frame, index):
+#         diff = self.calc_diff(frame, index)
+#         metric = self.calc_metric(diff, index)
