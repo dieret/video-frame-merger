@@ -22,13 +22,6 @@ if __name__ == "__main__":
              "VideoFrameIterator, SinglFramesIterator, "
              "BurstFrameIterator.")
     parser.add_argument(
-        "-s",
-        "--show",
-        action="store_true",
-        default=False,
-        help="Show picture upon completion."
-    )
-    parser.add_argument(
         "-o",
         "--output",
         default=os.path.join("out", "out.png"),
@@ -37,18 +30,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "-m",
         "--merger",
-        default="DefaultMerger",
+        default="SimpleMerger",
         help="Merger. This is what actually merges all frames."
     )
-    parser.add_argument(
-        "-d",
-        "--save-diff",
-        dest="save_diff",
-        action="store_true",
-        default=False,
-        help="Save diffs."
-    )
-
 
     args = parser.parse_args()
 
@@ -58,10 +42,4 @@ if __name__ == "__main__":
 
     inpt = input.Input(args.input_path, getattr(input, args.iterator))
     m = getattr(merger, args.merger)(inpt)
-    m.save_diff = args.save_diff
-    m.merge_all()
-
-    if args.show:
-        m.show_image(m.merged_image)
-
-    m.save_image(m.merged_image, path=args.output)
+    m.run()
