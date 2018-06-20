@@ -207,21 +207,24 @@ class PatchedMeanCutoffMerger(SimpleMerger):
         self.mean = np.concatenate((left, right), axis = 1)
 
 
-# class OverlayMerger(SimpleMerger):
-#
-#     def __init__(self, inpt):
-#         super().__init__(inpt)
-#
-#     def calc_mean(self):
-#         for frame in self.input.get_frames():
-#             return frame
-#
-#     def calc_metric(self):
-#         metric = np.sqrt(np.sum(np.square(self.diff/255), axis=-1))
-#         metric = cv2.GaussianBlur(metric, (5, 5), 1)
-#         metric = np.piecewise(metric, [metric < 0.1, metric >= 0.1], [0, 1])
-#         return metric
-#
-#     def merge_frame(self, frame, index):
-#         diff = self.calc_diff(frame, index)
-#         metric = self.calc_metric(diff, index)
+class OverlayMerger(PatchedMeanCutoffMerger):
+
+    def __init__(self, inpt):
+        super().__init__(inpt)
+        self.save.append("merge")
+
+    def calc_metric(self):
+        # difference to PatchedMeanCutoffMerger: Take 0, not just small value
+        metric = np.sqrt(np.sum(np.square(self.diff/255), axis=-1))
+        metric = cv2.GaussianBlur(metric, (5, 5), 1)
+        metric = np.piecewise(metric, [metric < 0.1, metric >= 0.1], [0, 1])
+        self.metric = metric.reshape(self.shape_scalar)
+
+    def calc_sum_layers(self):
+        if self.index == 0:
+            self.sum_layers = self.frame
+        else:
+            self.sum_layers = (1-self.metric) * self.sum_layers + self.metric * self.frame
+
+    def calc_final(self):
+        self.final = self.sum_layers
