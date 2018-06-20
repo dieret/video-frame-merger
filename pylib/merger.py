@@ -31,6 +31,10 @@ class Merger(object):
     def run(self):
         raise NotImplementedError
 
+    def get_final_image(self):
+        raise NotImplementedError
+
+    # fixme: somehow this is acting weird...
     @staticmethod
     def show_image(image):
         cv2.imshow('Image', image)
@@ -137,6 +141,9 @@ class SimpleMerger(Merger):
         if "final" in self.save:
             self.save_image(self.final, "final")
 
+    def get_final_image(self):
+        return self.final
+
 
 class SimpleMeanMerger(SimpleMerger):
 
@@ -187,11 +194,17 @@ class CutoffMerger(SimpleMerger):
 
     def __init__(self, inpt):
         super().__init__(inpt)
+        self.metric_threshold = 0.1
+        self.metric_min = 0.1 / self._input.number_images
+        self.metric_max = 1
 
     def calc_metric(self):
         metric = np.sqrt(np.sum(np.square(self.diff/255), axis=-1))
         metric = cv2.GaussianBlur(metric, (5, 5), 1)
-        metric = np.piecewise(metric, [metric < 0.1, metric >= 0.1], [0.1 / self._input.number_images, 1])
+        metric = np.piecewise(
+            metric,
+            [metric < self.metric_threshold, metric >= self.metric_threshold],
+            [self.metric_min, self.metric_max])
         self.metric = metric.reshape(self._shape_scalar)
 
 
@@ -202,7 +215,7 @@ class SimpleMeanCutoffMerger(CutoffMerger):
 
     def calc_mean(self):
         for frame in self._input.get_frames():
-             self.mean_image = frame
+             self.mean = frame
              return
 
 
@@ -224,13 +237,7 @@ class OverlayMerger(PatchedMeanCutoffMerger):
     def __init__(self, inpt):
         super().__init__(inpt)
         self.save.append("merge")
-
-    def calc_metric(self):
-        # difference to PatchedMeanCutoffMerger: Take 0, not just small value
-        metric = np.sqrt(np.sum(np.square(self.diff/255), axis=-1))
-        metric = cv2.GaussianBlur(metric, (5, 5), 1)
-        metric = np.piecewise(metric, [metric < 0.1, metric >= 0.1], [0, 1])
-        self.metric = metric.reshape(self._shape_scalar)
+        self.metric_min = 0
 
     def calc_sum_layers(self):
         if self.index == 0:
@@ -240,3 +247,19 @@ class OverlayMerger(PatchedMeanCutoffMerger):
 
     def calc_final(self):
         self.final = self.sum_layers
+
+
+class RunningDifferenceMerger(SimpleMeanCutoffMerger):
+
+    def __init__(self, inpt):
+        super().__init__(inpt)
+        self.save.extend(["diff", "metric", "merge"])
+        self.metric_threshold = 0.3
+
+    def calc_diff(self):
+        super().calc_diff()
+        self.diff[self.diff < 0] = 0
+
+    def calc_sum_layers(self):
+        super().calc_sum_layers()
+        self.mean = self.frame

@@ -21,12 +21,24 @@ if __name__ == "__main__":
         help="Frame iterator. Currently 3 options: "
              "VideoFrameIterator, SinglFramesIterator, "
              "BurstFrameIterator.")
+
+    # todo: implement
     parser.add_argument(
         "-o",
         "--output",
         default=os.path.join("out", "out.png"),
         help="Output path."
     )
+
+    # todo: implement
+    parser.add_argument(
+        "-s",
+        "--show",
+        action="store_true",
+        default=False,
+        help="Show final picture."
+    )
+
     parser.add_argument(
         "-m",
         "--merger",
