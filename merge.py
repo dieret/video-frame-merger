@@ -58,6 +58,7 @@ if __name__ == "__main__":
         "--parameter",
         type=str,
         nargs="+",
+        default=[],
         help="Set parameters of your merger. Give strings like "
              "<param_name>=<param_value>."
     )

@@ -71,6 +71,8 @@ class FrameIterator(object):
         self.index = 0
         self._rewind()
 
+        self.time_previous = None
+
     def _rewind(self):
         pass
 
@@ -79,7 +81,7 @@ class FrameIterator(object):
         if frame is None:
             raise StopIteration
 
-        self.logger.debug("Frame no {}".format(self.index))
+        self.logger.debug("Returning frame no {}".format(self.index))
 
         if not frame.shape == self.shape:
             self.logger.warning(

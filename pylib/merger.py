@@ -5,6 +5,7 @@ import numpy as np
 import os.path
 import os
 import cv2
+import time
 
 
 class Merger(object):
@@ -62,6 +63,7 @@ class Merger(object):
         new_size = (int(new_size[0]), int(new_size[1]))
 
         # ** resize **
+        # Note that cv2.imshow has trouble with floats as image type, so cast it!
         resized = cv2.resize(image, (new_size[1], new_size[0])).astype(np.uint8)
 
         # ** display **
@@ -169,7 +171,15 @@ class SimpleMerger(Merger):
         if "mean" in self.preview:
             self.preview_image(self.mean, "mean")
 
+        start_time = time.time()
         for self.index, self.frame in enumerate(self._input.get_frames()):
+            fps=0
+            if self.index >= 1:
+                fps = self.index/(time.time() - start_time)
+
+            self._logger.debug("Processing frame {:04} (fps: {:02.2f})".format(
+                self.index, fps))
+
             self.calc_all()
 
             if "frame" in self.save:
