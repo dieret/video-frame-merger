@@ -33,8 +33,17 @@ if __name__ == "__main__":
         type=str,
         nargs="+",
         default=["final"],
-        choices=["mean", "diff", "metric", "merge", "final"],
+        choices=["frame", "mean", "diff", "metric", "merge", "final"],
         help="Which steps to save."
+    )
+    parser.add_argument(
+        "-v",
+        "--preview",
+        type=str,
+        nargs="+",
+        default=["final"],
+        choices=["frame", "mean", "diff", "metric", "merge", "final"],
+        help="Which steps to preview."
     )
     parser.add_argument(
         "-m",
@@ -62,6 +71,7 @@ if __name__ == "__main__":
     i = inputdata.InputData(args.input_path, getattr(inputdata, args.iterator))
     m = getattr(merger, args.merger)(i)
     m.save = args.save
+    m.preview = args.preview
 
     if args.name:
         m.name = args.name

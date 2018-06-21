@@ -21,6 +21,8 @@ class Merger(object):
 
         # which steps should be saved
         self.save = []
+        # live preview
+        self.preview = []
 
         # For convenience:
         self._shape_rgb = inpt.shape  # height x width x 3
@@ -37,16 +39,40 @@ class Merger(object):
     def get_final_image(self):
         raise NotImplementedError
 
-    # fixme: somehow this is acting weird...
-    @staticmethod
-    def show_image(image):
-        cv2.imshow('Image', image)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
+    def preview_image(self, image, name="image", max_height=500, max_width=None):
+
+        # ** determine size to be displayed **
+        old_height, old_width, _ = image.shape
+        if max_width and max_height:
+            new_size = (max_height, max_width)
+        elif max_width:
+            if max_width >= old_width:
+                new_size = (old_height, old_width)
+            else:
+                scale = max_width/old_width
+                new_size = (scale * old_height, scale * old_width)
+        elif max_height:
+            if max_height >= old_height:
+                new_size = (old_height, old_width)
+            else:
+                scale = max_height/old_height
+                new_size = (scale * old_height, scale * old_width)
+        else:
+            new_size = (old_height, old_width)
+        new_size = (int(new_size[0]), int(new_size[1]))
+
+        # ** resize **
+        resized = cv2.resize(image, (new_size[1], new_size[0])).astype(np.uint8)
+
+        # ** display **
+        # Note: waitKey(1) waits 1ms, waitKey(0) actually waits for key
+        # Name is the name of the window to be updated/created
+        cv2.imshow(name, resized)
+        cv2.waitKey(1)
 
     def save_image(self, image, prefix="", frame_no=None):
         filename = prefix
-        if frame_no:
+        if not frame_no is None:
             filename += "_{:04}".format(frame_no)
         if not filename:
             filename = "out"
@@ -131,17 +157,23 @@ class SimpleMerger(Merger):
         self.calc_metric()
         self.calc_sum_metric()
         self.calc_sum_layers()
+        if "merge" in self.preview or "merge" in self.save:
+            self.calc_final()
 
     def run(self):
         self._logger.debug("Run!")
 
-        mean = self.calc_mean()
+        self.calc_mean()
         if "mean" in self.save:
-            self.save_image(mean, "mean")
+            self.save_image(self.mean, "mean")
+        if "mean" in self.preview:
+            self.preview_image(self.mean, "mean")
 
         for self.index, self.frame in enumerate(self._input.get_frames()):
             self.calc_all()
 
+            if "frame" in self.save:
+                self.save_image(self.frame, "frame", self.index)
             if "diff" in self.save:
                 self.save_image(self.diff, "diff", self.index)
             if "metric" in self.save:
@@ -149,12 +181,22 @@ class SimpleMerger(Merger):
                                 "metric",
                                 self.index)
             if "merge" in self.save:
-                self.calc_final()
                 self.save_image(self.final, "merge", self.index)
+
+            if "frame" in self.preview:
+                self.preview_image(self.frame, "frame")
+            if "diff" in self.preview:
+                self.preview_image(self.diff, "diff")
+            if "metric" in self.preview:
+                self.preview_image(self.scalar_to_grayscale(self.metric), "metric")
+            if "merge" in self.preview:
+                self.preview_image(self.final, "merge")
 
         self.calc_final()
         if "final" in self.save:
             self.save_image(self.final, "final")
+        if "final" in self.preview:
+            self.preview_image(self.final, "final")
 
     def get_final_image(self):
         return self.final
