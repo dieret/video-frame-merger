@@ -7,24 +7,26 @@ import os
 import cv2
 import time
 from . import util
+import configobj
 
 
 class Merger(object):
     """ This class overlays frames and produces an output image. """
-    def __init__(self, inpt):
+    def __init__(self, inpt, config: configobj.ConfigObj):
 
         self._input = inpt
+        self._config = config
 
         self.name = os.path.splitext(os.path.basename(inpt.path))[0]
 
-        self.image_format = "png"
-
         self._logger = log.setup_logger("Merger")
 
+        self.image_format = self._config["Merger"]["General"]["image_format"]
+
         # which steps should be saved
-        self.save = []
+        self.save = self._config["Merger"]["General"]["save"]
         # live preview
-        self.preview = []
+        self.preview = self._config["Merger"]["General"]["preview"]
         self.preview_max_size = (500, None)  # height, width
 
         # For convenience:
@@ -89,11 +91,11 @@ class SimpleMerger(Merger):
     from which we calculate a metric, (e.g. R^3 distance).
     We then sum over all frame * metric and divide by the sum of metric. """
 
-    def __init__(self, inpt):
+    def __init__(self, inpt, config):
         """ Initialize
         :param inpt: InputData object (from pylib/input)
         """
-        super().__init__(inpt)
+        super().__init__(inpt, config)
 
         # preprocess options:
 
@@ -103,19 +105,6 @@ class SimpleMerger(Merger):
 
         # ** How to convert rgb diff to sclar metric? **
         # options: R3
-        self.metric_strategy = "R3"
-        self.zero_value = 1
-        self.intensity = 500
-        self.blur_shape = (5, 5)
-        self.blur_sigmas = (0, 0)
-
-        # ** Postprocessing of metric **
-        # Options: Cutoff, Edge detection
-        self.metric_postprocessing = ["cutoff", "edge"]
-        # Note: Metric is normalized between 0 and 1
-        self.cutoff_threshold = 0.1
-        self.cutoff_min = 0.1 / self._input.number_images
-        self.cutoff_max = 1
 
         # ** Layer (e.g. frame * metric) **
         # Options: normal, overlay
@@ -150,14 +139,17 @@ class SimpleMerger(Merger):
         :return: numpy.ndarray(shape=(height, width, 1), np.float)
             with values between 0 and 1
         """
-        if self.metric_strategy == "R3":
-            metric = self.zero_value + \
-                     self.intensity * np.sqrt(np.sum(np.square(diff/255),
+
+        conf = self._config["Merger"]["Metric"]
+
+        if conf["strategy"] == "R3":
+            metric = conf["zero_value"] + \
+                     conf["intensity"] * np.sqrt(np.sum(np.square(diff/255),
                                                      axis=-1))
             metric = cv2.GaussianBlur(metric,
-                                      self.blur_shape,
-                                      self.blur_sigmas[0],
-                                      self.blur_sigmas[1])
+                                      tuple(conf["blur_shape"]),
+                                      conf["blur_sigmas"][0],
+                                      conf["blur_sigmas"][1])
 
         else:
             raise NotImplementedError
@@ -177,22 +169,24 @@ class SimpleMerger(Merger):
             with values between 0 and 1.
         """
 
-        if "cutoff" in self.metric_postprocessing:
+        conf = self._config["Merger"]["MetricPostProcessing"]
+
+        if "cutoff" in conf["postprocessing"]:
             # todo: make this take a list of thresholds and values and let
             # us automatically generate this
             metric = np.piecewise(
                 metric,
                 [
-                    metric < self.cutoff_threshold,
-                    metric >= self.cutoff_threshold
+                    metric < conf["cutoff"]["threshold"],
+                    metric >= conf["cutoff"]["threshold"]
                 ],
                 [
-                    self.cutoff_min,
-                    self.cutoff_max
+                    conf["cutoff"]["min"],
+                    conf["cutoff"]["max"]
                 ]
             )
 
-        if "edge" in self.metric_postprocessing:
+        if "edge" in conf["postprocessing"]:
             # todo: options for canny as class variable
             gray = metric * 255
             gray = gray.reshape(self._shape).astype(np.uint8)
