@@ -21,14 +21,10 @@ class Merger(object):
 
         self._logger = log.setup_logger("m")
 
-        self.image_format = self._config["m"]["image_format"]
-
         # which steps should be saved
         self.save = self._config["m"]["save"]
         # live preview
         self.preview = self._config["m"]["preview"]
-
-        self.preview_max_size = self._config["m"]["preview_max_size"]
 
         # For convenience:
         self._shape_rgb = inpt.shape  # height x width x 3
@@ -48,7 +44,8 @@ class Merger(object):
                 (len(image.shape) == 3 and image.shape[2] == 1):
             image = self.scalar_to_grayscale(image)
 
-        new_size = util.new_size(image.shape, self.preview_max_size)
+        new_size = util.new_size(image.shape,
+                                 self._config["m"]["preview_max_size"])
 
         # Note that cv2.imshow has trouble with floats as image type, so cast
         # it! Also note that image dimensions are width x height, where as the
@@ -66,7 +63,7 @@ class Merger(object):
             filename += "_{:04}".format(frame_no)
         if not filename:
             filename = "out"
-        filename += ".{}".format(self.image_format)
+        filename += ".{}".format(self._config["m"]["image_format"])
         path = os.path.join(self.output_dir, filename)
 
         _dir = os.path.dirname(path)
@@ -85,7 +82,7 @@ class Merger(object):
 
     @staticmethod
     def scalar_to_grayscale(scalar):
-        assert(2<= len(scalar.shape) <= 3)
+        assert(2 <= len(scalar.shape) <= 3)
         if scalar.shape == 2:
             scalar = scalar.reshape((*scalar.shape, 1))
         assert(len(scalar.shape) == 3 and scalar.shape[2] == 1)
@@ -169,6 +166,8 @@ class SimpleMerger(Merger):
                                       tuple(conf["blur"]["shape"]),
                                       *conf["blur"]["sigmas"])
 
+        # todo: options to clear speccles
+
         if "cutoff" in conf["operations"]:
             # todo: make this take a list of thresholds and values and let
             # us automatically generate this
@@ -191,8 +190,7 @@ class SimpleMerger(Merger):
                               conf["edge"]["canny2"])
             edges = edges.astype(np.float)
             metric = edges
-
-        # todo: options to clear speccles
+            # todo: option to make thicker
 
         # normalize metric
         metric /= metric.max()
@@ -200,19 +198,29 @@ class SimpleMerger(Merger):
         return metric
 
     def calc_merge(self, sum_layer: np.ndarray, sum_metric: np.ndarray) -> np.ndarray:
-        conf = self._config["m"]["layer"]
+        conf = self._config["m"]["overlay"]
 
-        if conf["strategy"] == "overlay":
+        if conf["strategy"] in ["overlay", "overlaymean"]:
             merge = sum_layer
         elif conf["strategy"] == "add":
             merge = sum_layer/sum_metric
         else:
             raise ValueError("Unknown parameter.")
 
+        # todo: add normalization option
+
         # Convert to uint8
         merge[merge < 0.] = 0.
         merge = merge.astype(np.uint8)
         return merge
+
+    def calc_layer(self, frame, metric):
+        conf = self._config["m"]["layer"]
+        layer = conf["multiply"] * frame * metric
+        layer += conf["add"]
+        # todo: add normalization option
+        layer[layer > 255.] = 255.
+        return layer
 
     def run(self):
         self._logger.debug("Run!")
@@ -242,33 +250,39 @@ class SimpleMerger(Merger):
 
             diff = self.calc_diff(mean, frame)
             metric = self.calc_metric(diff)
-            layer = frame * metric
+            layer = self.calc_layer(frame, metric)
 
             sum_metric += metric
 
-            if self._config["m"]["layer"]["strategy"] == "overlay":
+            # * overlay *
+            layer_strat = self._config["m"]["overlay"]["strategy"]
+            if layer_strat == "overlay":
                 if index == 0:
                     sum_layer = frame
                 else:
                     sum_layer = (1-metric) * sum_layer + layer
-            else:
+            elif layer_strat == "add":
                 sum_layer += layer
+            elif layer_strat == "overlaymean":
+                sum_layer = (1-metric) * mean + layer
+            else:
+                raise ValueError
 
             if "merge" in self.preview or "merge" in self.save:
                 merge = self.calc_merge(sum_layer, sum_metric)
 
             # ** Save/Preview **
 
-            allowed = ["frame", "diff", "metric", "layer", "sum_metric",
+            allowed = ["frame", "diff", "metric", "overlay", "sum_metric",
                        "sum_layer", "merge", "final"]
 
             for item in self.save:
                 if item == "final":
                     continue
                 if item not in allowed:
-                    self._logger.error(
-                        "Invalid value for save: '{}'. "
-                        "Skipping this for now.".format(item))
+                    msg = "Invalid value for save: '{}'. " \
+                          "Skipping this for now.".format(item)
+                    self._logger.error(msg)
                     continue
                 self.save_image(locals()[item], item, index)
 
@@ -276,12 +290,11 @@ class SimpleMerger(Merger):
                 if item == "final":
                     continue
                 if item not in allowed:
-                    self._logger.error(
-                        "Invalid value for preview: '{}'. "
-                        "Skipping this for now.".format(item))
+                    msg = "Invalid value for preview: '{}'. " \
+                          "Skipping this for now.".format(item)
+                    self._logger.error(msg)
                     continue
                 self.preview_image(locals()[item], item)
-
 
         if "final" in self.save or "final" in self.preview:
             merge = self.calc_merge(sum_layer, sum_metric)

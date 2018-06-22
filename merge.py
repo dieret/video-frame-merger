@@ -48,7 +48,6 @@ def get_cli_options(logger: logging.Logger):
         type=str,
         nargs="+",
         default=None,
-        choices=["frame", "mean", "diff", "metric", "merge", "final"],
         help="Which steps to save."
     )
     parser.add_argument(
@@ -57,7 +56,6 @@ def get_cli_options(logger: logging.Logger):
         type=str,
         nargs="+",
         default=None,
-        choices=["frame", "mean", "diff", "metric", "merge", "final"],
         help="Which steps to preview."
     )
     parser.add_argument(
@@ -183,7 +181,7 @@ def set_config_option(config: configobj.ConfigObj, path: List[str], value: Any,
             this_config = this_config[key]
         except KeyError:
             logger.error("The config item '{}' does not "
-                         "seem to exist.".format("/".join(keys)))
+                         "seem to exist.".format(_path))
             raise ValueError
     this_config[path[-1]] = value
     logger.debug("Setting config item '{}' to value '{}' ({})".format(
