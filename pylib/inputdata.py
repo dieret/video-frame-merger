@@ -8,6 +8,7 @@ import os.path
 import numpy as np
 
 
+# todo: Probably we don't need this abstraction layer
 class InputData(object):
     """ This class decides which FrameIterator class to take and also can
     load all images into ram. """
@@ -52,6 +53,7 @@ class InputData(object):
         return self._frame_iterator.fps
 
 
+# todo: add option to preprocess frames
 class FrameIterator(object):
     """ This class will be subclassed by implementing the get_frame method.
     Iterate over this class to get all frames of vide/input. """

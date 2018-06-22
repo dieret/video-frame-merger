@@ -112,9 +112,11 @@ class SimpleMerger(Merger):
         """
         super().__init__(inpt)
 
+        # preprocess options:
+
         # todo: put in one config object/config file
         # options: mean, single, patched
-        self.mean_strategy = "mean"
+        self.mean_strategy = "patched"
 
         # ** How to convert rgb diff to sclar metric? **
         # options: R3
@@ -126,7 +128,7 @@ class SimpleMerger(Merger):
 
         # ** Postprocessing of metric **
         # Options: Cutoff, Edge detection
-        self.metric_postprocessing = []
+        self.metric_postprocessing = ["cutoff", "edge"]
         # Note: Metric is normalized between 0 and 1
         self.cutoff_threshold = 0.1
         self.cutoff_min = 0.1 / self._input.number_images
@@ -155,14 +157,10 @@ class SimpleMerger(Merger):
         else:
             raise NotImplementedError
 
-    def preprocess_frame(self, frame):
-        # todo: option to scale down
-        return frame
-
     def calc_diff(self, mean, frame):
         return mean - frame
 
-    def calc_metric(self, diff: np.ndarray) -> np.ndarray(dtype=float):
+    def calc_metric(self, diff: np.ndarray) -> np.ndarray:
         """ Converts difference to metric
         :param diff: Difference between frame and mean as
             numpy.ndarray(shape=(height, width, 3), np.uint8)
@@ -188,7 +186,7 @@ class SimpleMerger(Merger):
         shape = (diff.shape[0], diff.shape[1], 1)
         return metric.reshape(shape)
 
-    def calc_metric_postprocessing(self, metric: np.ndarray(dtype=float)) -> np.ndarray(dtype=float):
+    def calc_metric_postprocessing(self, metric: np.ndarray) -> np.ndarray:
         """ Metric postprocessing (e.g. cutoffs, edge detections etc.)
         :param metric: Metric as numpy.ndarray(shape=(height, width), np.float)
             with values between 0 and 1.
@@ -260,7 +258,6 @@ class SimpleMerger(Merger):
 
             # ** calculations **
 
-            frame = self.preprocess_frame(frame)
             diff = self.calc_diff(mean, frame)
             metric = self.calc_metric(diff)
             layer = frame * metric
