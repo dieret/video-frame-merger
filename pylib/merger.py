@@ -19,14 +19,14 @@ class Merger(object):
 
         self.name = os.path.splitext(os.path.basename(inpt.path))[0]
 
-        self._logger = log.setup_logger("Merger")
+        self._logger = log.setup_logger("m")
 
-        self.image_format = self._config["Merger"]["General"]["image_format"]
+        self.image_format = self._config["m"]["image_format"]
 
         # which steps should be saved
-        self.save = self._config["Merger"]["General"]["save"]
+        self.save = self._config["m"]["save"]
         # live preview
-        self.preview = self._config["Merger"]["General"]["preview"]
+        self.preview = self._config["m"]["preview"]
         self.preview_max_size = (500, None)  # height, width
 
         # For convenience:
@@ -140,19 +140,15 @@ class SimpleMerger(Merger):
             with values between 0 and 1
         """
 
-        conf = self._config["Merger"]["Metric"]
+        conf = self._config["m"]["metric"]
 
-        if conf["strategy"] == "R3":
-            metric = conf["zero_value"] + \
-                     conf["intensity"] * np.sqrt(np.sum(np.square(diff/255),
-                                                     axis=-1))
-            metric = cv2.GaussianBlur(metric,
-                                      tuple(conf["blur_shape"]),
-                                      conf["blur_sigmas"][0],
-                                      conf["blur_sigmas"][1])
-
+        if conf["strategy"] == "r3":
+            metric = np.sqrt(np.sum(np.square(diff/255), axis=-1))
         else:
             raise NotImplementedError
+
+        metric *= conf["intensity"]
+        metric += conf["zero"]
 
         # normalize metric
         metric /= metric.max()
@@ -169,9 +165,14 @@ class SimpleMerger(Merger):
             with values between 0 and 1.
         """
 
-        conf = self._config["Merger"]["MetricPostProcessing"]
+        conf = self._config["m"]["mpp"]
 
-        if "cutoff" in conf["postprocessing"]:
+        if "blur" in conf["operations"]:
+            metric = cv2.GaussianBlur(metric,
+                                      tuple(conf["blur"]["shape"]),
+                                      *conf["blur"]["sigmas"])
+
+        if "cutoff" in conf["operations"]:
             # todo: make this take a list of thresholds and values and let
             # us automatically generate this
             metric = np.piecewise(
@@ -186,7 +187,7 @@ class SimpleMerger(Merger):
                 ]
             )
 
-        if "edge" in conf["postprocessing"]:
+        if "edge" in conf["operations"]:
             # todo: options for canny as class variable
             gray = metric * 255
             gray = gray.reshape(self._shape).astype(np.uint8)
