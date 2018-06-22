@@ -10,5 +10,9 @@ data/burst/**
 __pycache__/**
 *.pyc
 
+
+out.config
+
 # incase symlink
 data/untracked 
+
