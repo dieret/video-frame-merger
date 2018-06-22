@@ -9,7 +9,7 @@ import validate
 import pylib.log as log
 import os.path
 import logging
-from typing import List, Any
+from typing import List, Any, Union
 
 
 def get_cli_options(logger: logging.Logger):
@@ -98,7 +98,17 @@ def load_config_file(path: str, logger: logging.Logger) -> configobj.ConfigObj:
         logger.critical(msg)
         raise ValueError
 
+    config = validate_config_file(config, logger)
+
+    return config
+
+
+def validate_config_file(config: configobj.ConfigObj,
+                         logger: logging.Logger) -> configobj.ConfigObj:
+    """ Validate config file, i.e. check that everything is set properly. """
+
     logger.debug("Validating config file.")
+
     valid = config.validate(validate.Validator(), preserve_errors=True,
                             copy=True)
 
@@ -210,9 +220,7 @@ if __name__ == "__main__":
             logger.error("Skipping this issue for now.")
             continue
 
-    logger.debug("Validating config file again")
-    valid = config.validate(validate.Validator(), preserve_errors=True,
-                            copy=True)
+    config = validate_config_file(config, logger)
 
     logger.info("Saving config file to tmp.config.")
     config.filename = "tmp.config"
