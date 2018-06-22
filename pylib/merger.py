@@ -39,8 +39,7 @@ class Merger(object):
     def run(self):
         raise NotImplementedError
 
-    def preview_image(self, image, name="image", max_height=500, max_width=None):
-
+    def preview_image(self, image, name="image"):
         new_size = util.new_size(image.shape, self.preview_max_size)
 
         # Note that cv2.imshow has trouble with floats as image type, so cast
