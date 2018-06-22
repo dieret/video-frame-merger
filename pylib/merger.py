@@ -37,9 +37,6 @@ class Merger(object):
     def run(self):
         raise NotImplementedError
 
-    def get_final_image(self):
-        raise NotImplementedError
-
     def preview_image(self, image, name="image", max_height=500, max_width=None):
 
         # ** determine size to be displayed **
@@ -101,6 +98,8 @@ class Merger(object):
         return np.concatenate((normed, normed, normed), 2)
 
 
+# todo: implement metric histograms
+
 class SimpleMerger(Merger):
     """ This merger first calculates a mean (default: average over all frames),
     then, for each frame calculates a difference (default: mean - difference),
@@ -113,263 +112,197 @@ class SimpleMerger(Merger):
         """
         super().__init__(inpt)
 
-        # Progress images to save
-        # mean, diff, metric, merge, final
-        self.save = ["final"]
+        # todo: put in one config object/config file
+        # options: mean, single, patched
+        self.mean_strategy = "mean"
 
-        # these values will be continuously updated in the self.run loop
-        # This will allow us more flexibility than using parameters for the
-        # class functions.
+        # ** How to convert rgb diff to sclar metric? **
+        # options: R3
+        self.metric_strategy = "R3"
+        self.zero_value = 1
+        self.intensity = 500
+        self.blur_shape = (5, 5)
+        self.blur_sigmas = (0, 0)
 
-        self.index = 0      # number of current frame
-        self.frame = None   # current frame
-        self.mean = None    # mean of all frames
-        self.diff = None    # mean - frame
-        self.metric = None  # metric(diff)
+        # ** Postprocessing of metric **
+        # Options: Cutoff, Edge detection
+        self.metric_postprocessing = []
+        # Note: Metric is normalized between 0 and 1
+        self.cutoff_threshold = 0.1
+        self.cutoff_min = 0.1 / self._input.number_images
+        self.cutoff_max = 1
 
-        self.sum_metric = np.zeros(shape=self._shape_scalar, dtype=float)
+        # ** Layer (e.g. frame * metric) **
+        # Options: normal, overlay
+        self.layer_strategy = "normal"
 
-        # We call metric * frame a layer. This is the sum of those
-        self.sum_layers = np.zeros(shape=self._shape_rgb, dtype=float)
+    def calc_mean(self) -> np.ndarray:
+        if self.mean_strategy == "mean":
+            return sum(self._input.get_frames()) / self._input.number_images
 
-        # This is sum_layers/sum_metric. Also continuously updated if we
-        # choose to save it.
-        self.final = None
+        elif self.mean_strategy == "single":
+            # return first frame
+            for frame in self._input.get_frames():
+                return frame
 
-    def calc_mean(self):
-        self.mean = sum(self._input.get_frames()) / self._input.number_images
+        elif self.mean_strategy == "patched":
+            width = self._input.shape[1]
+            width_left = int(width/2)
+            left = self._input.get_frame(-1)[:, :width_left, :]
+            right = self._input.get_frame(0)[:, width_left:, :]
+            return np.concatenate((left, right), axis=1)
 
-    def calc_diff(self):
-        self.diff = self.mean - self.frame
+        else:
+            raise NotImplementedError
 
-    def calc_metric(self):
-        raise NotImplementedError
+    def preprocess_frame(self, frame):
+        # todo: option to scale down
+        return frame
 
-    def calc_sum_metric(self):
-        self.sum_metric += self.metric
+    def calc_diff(self, mean, frame):
+        return mean - frame
 
-    def calc_sum_layers(self):
-        self.sum_layers += self.frame * self.metric
+    def calc_metric(self, diff: np.ndarray) -> np.ndarray(dtype=float):
+        """ Converts difference to metric
+        :param diff: Difference between frame and mean as
+            numpy.ndarray(shape=(height, width, 3), np.uint8)
+        :return: numpy.ndarray(shape=(height, width, 1), np.float)
+            with values between 0 and 1
+        """
+        if self.metric_strategy == "R3":
+            metric = self.zero_value + \
+                     self.intensity * np.sqrt(np.sum(np.square(diff/255),
+                                                     axis=-1))
+            metric = cv2.GaussianBlur(metric,
+                                      self.blur_shape,
+                                      self.blur_sigmas[0],
+                                      self.blur_sigmas[1])
 
-    def calc_final(self):
-        self.final = self.sum_layers / self.sum_metric
+        else:
+            raise NotImplementedError
 
-    def calc_all(self):
-        self.calc_diff()
-        self.calc_metric()
-        self.calc_sum_metric()
-        self.calc_sum_layers()
-        if "merge" in self.preview or "merge" in self.save:
-            self.calc_final()
+        # normalize metric
+        metric /= metric.max()
+
+        metric = self.calc_metric_postprocessing(metric)
+        shape = (diff.shape[0], diff.shape[1], 1)
+        return metric.reshape(shape)
+
+    def calc_metric_postprocessing(self, metric: np.ndarray(dtype=float)) -> np.ndarray(dtype=float):
+        """ Metric postprocessing (e.g. cutoffs, edge detections etc.)
+        :param metric: Metric as numpy.ndarray(shape=(height, width), np.float)
+            with values between 0 and 1.
+        :return: Metric as numpy.ndarray(shape=(height, width), np.float)
+            with values between 0 and 1.
+        """
+
+        if "cutoff" in self.metric_postprocessing:
+            # todo: make this take a list of thresholds and values and let
+            # us automatically generate this
+            metric = np.piecewise(
+                metric,
+                [
+                    metric < self.cutoff_threshold,
+                    metric >= self.cutoff_threshold
+                ],
+                [
+                    self.cutoff_min,
+                    self.cutoff_max
+                ]
+            )
+
+        if "edge" in self.metric_postprocessing:
+            # todo: options for canny as class variable
+            gray = metric * 255
+            gray = gray.reshape(self._shape).astype(np.uint8)
+            edges = cv2.Canny(gray, 100, 200)
+            edges = edges.astype(np.float)
+            metric = edges
+
+        # normalize metric
+        metric /= metric.max()
+
+        return metric
+
+    def calc_merge(self, sum_layer: np.ndarray, sum_metric: np.ndarray) -> np.ndarray:
+        if self.layer_strategy == "overlay":
+            merge = sum_layer
+        else:
+            merge = sum_layer/sum_metric
+
+        # Convert to uint8
+        merge[merge < 0.] = 0.
+        merge = merge.astype(np.uint8)
+        return merge
 
     def run(self):
         self._logger.debug("Run!")
 
-        self.calc_mean()
-        if "mean" in self.save:
-            self.save_image(self.mean, "mean")
-        if "mean" in self.preview:
-            self.preview_image(self.mean, "mean")
+        mean = self.calc_mean()
 
+        if "mean" in self.save:
+            self.save_image(mean, "mean")
+        if "mean" in self.preview:
+            self.preview_image(mean, "mean")
+
+        sum_metric = np.zeros(shape=self._shape_scalar, dtype=float)
+        sum_layer = np.zeros(shape=self._shape_rgb, dtype=float)
         start_time = time.time()
-        for self.index, self.frame in enumerate(self._input.get_frames()):
-            fps=0
-            if self.index >= 1:
-                fps = self.index/(time.time() - start_time)
+        for index, frame in enumerate(self._input.get_frames()):
+
+            if index >= 1:
+                fps = index/(time.time() - start_time)
+            else:
+                fps=0
 
             self._logger.debug("Processing frame {:04} (fps: {:02.2f})".format(
-                self.index, fps))
+                index, fps))
 
-            self.calc_all()
+            # ** calculations **
+
+            frame = self.preprocess_frame(frame)
+            diff = self.calc_diff(mean, frame)
+            metric = self.calc_metric(diff)
+            layer = frame * metric
+            sum_metric += metric
+
+            if self.layer_strategy == "overlay":
+                if index == 0:
+                    sum_layer = frame
+                else:
+                    sum_layer = (1-metric) * sum_layer + layer
+            else:
+                sum_layer += layer
+
+            if "merge" in self.preview or "merge" in self.save:
+                merge = self.calc_merge(sum_metric, sum_layer)
+
+            # ** saving **
 
             if "frame" in self.save:
-                self.save_image(self.frame, "frame", self.index)
+                self.save_image(frame, "frame", index)
             if "diff" in self.save:
-                self.save_image(self.diff, "diff", self.index)
+                self.save_image(diff, "diff", index)
             if "metric" in self.save:
-                self.save_image(self.scalar_to_grayscale(self.metric),
-                                "metric",
-                                self.index)
+                self.save_image(self.scalar_to_grayscale(metric),
+                                "metric", index)
             if "merge" in self.save:
-                self.save_image(self.final, "merge", self.index)
+                self.save_image(merge, "merge", index)
+
+            # ** previews **
 
             if "frame" in self.preview:
-                self.preview_image(self.frame, "frame")
+                self.preview_image(frame, "frame")
             if "diff" in self.preview:
-                self.preview_image(self.diff, "diff")
+                self.preview_image(diff, "diff")
             if "metric" in self.preview:
-                self.preview_image(self.scalar_to_grayscale(self.metric), "metric")
+                self.preview_image(self.scalar_to_grayscale(metric), "metric")
             if "merge" in self.preview:
-                self.preview_image(self.final, "merge")
+                self.preview_image(merge, "merge")
 
-        self.calc_final()
+        if "final" in self.save or "final" in self.preview:
+            merge = self.calc_merge(sum_layer, sum_metric)
         if "final" in self.save:
-            self.save_image(self.final, "final")
+            self.save_image(merge, "final")
         if "final" in self.preview:
-            self.preview_image(self.final, "final")
-
-    def get_final_image(self):
-        return self.final
-
-
-class R3Merger(SimpleMerger):
-
-    def __init__(self, inpt):
-        super().__init__(inpt)
-
-        self.intensity = 500
-        self.blur_shape = (5, 5)
-
-    def calc_metric(self):
-        # change intensity to increase emphasis of outliers
-        metric = 1 + self.intensity * np.sqrt(np.sum(np.square(self.diff/255), axis=-1))
-        metric = cv2.GaussianBlur(metric, self.blur_shape, 0)
-        self.metric = metric.reshape(self._shape_scalar)
-
-
-class SimpleMeanMerger(R3Merger):
-
-    def __init__(self, inpt):
-        super().__init__(inpt)
-
-    def calc_mean(self):
-        for frame in self._input.get_frames():
-            self.mean = frame
-            return
-
-
-class CutoffMerger(SimpleMerger):
-
-    def __init__(self, inpt):
-        super().__init__(inpt)
-        self.metric_threshold = 0.1
-        self.metric_min = 0.1 / self._input.number_images
-        self.metric_max = 1
-        self.metric_blur_shape = (5, 5)
-        self.metric_blur_sigma = 0
-
-    def calc_metric(self):
-        metric = np.sqrt(np.sum(np.square(self.diff/255), axis=-1))
-        metric = cv2.GaussianBlur(metric, self.metric_blur_shape, self.metric_blur_sigma)
-        metric = np.piecewise(
-            metric,
-            [metric < self.metric_threshold, metric >= self.metric_threshold],
-            [self.metric_min, self.metric_max])
-        self.metric = metric.reshape(self._shape_scalar)
-
-
-class SimpleMeanCutoffMerger(CutoffMerger):
-
-    def __init__(self, inpt):
-        super().__init__(inpt)
-
-    def calc_mean(self):
-        for frame in self._input.get_frames():
-            self.mean = frame
-            return
-
-
-class PatchedMeanCutoffMerger(CutoffMerger):
-
-    def __init__(self, inpt):
-        super().__init__(inpt)
-
-    def calc_mean(self):
-        width = self._input.shape[1]
-        width_left = int(width/2)
-        left = self._input.get_frame(-1)[:, :width_left, :]
-        right = self._input.get_frame(0)[:, width_left:, :]
-        self.mean = np.concatenate((left, right), axis=1)
-
-
-class OverlayMerger(PatchedMeanCutoffMerger):
-
-    def __init__(self, inpt):
-        super().__init__(inpt)
-        self.metric_min = 0
-
-    def calc_sum_layers(self):
-        if self.index == 0:
-            self.sum_layers = self.frame
-        else:
-            self.sum_layers = (1-self.metric) * self.sum_layers + \
-                              self.metric * self.frame
-
-    def calc_final(self):
-        self.final = self.sum_layers
-
-
-class RunningDifferenceMerger(SimpleMeanCutoffMerger):
-
-    def __init__(self, inpt):
-        super().__init__(inpt)
-        self.metric_threshold = 0.05
-
-    def calc_diff(self):
-        super().calc_diff()
-        self.diff[self.diff < 0] = 0
-
-    def calc_all(self):
-        super().calc_all()
-        self.mean = self.frame
-
-
-class EdgeDetectionMerger(PatchedMeanCutoffMerger):
-
-    def __init__(self, inpt):
-        super().__init__(inpt)
-        self.metric_min = 0
-        self.metric_blur_shape = (11, 11)
-        self.metric_blur_sigma = 5
-
-    def calc_metric(self):
-        super().calc_metric()
-        gray = self.metric * 255
-        gray = gray.reshape(self._shape).astype(np.uint8)
-        edges = cv2.Canny(gray, 100, 200)
-        edges = edges.reshape(self._shape_scalar).astype(np.float)
-        self.metric = edges
-
-    def calc_sum_layers(self):
-        if self.index == 0:
-            # todo: if I use self.mean here, something really funny happens. Why?
-            self.sum_layers = self.frame
-        else:
-            self.sum_layers += self.metric
-
-    def calc_final(self):
-        self.final = self.sum_layers
-
-
-# class FifoMerger(object):
-#     """ This class overlays frames and produces an output image. """
-#     def __init__(self, inpt, fifo_length=1):
-#
-#         self.input = inpt
-#
-#         # height x width x 3
-#         self.shape_rgb = inpt.shape
-#         # height x width x 1
-#         self.shape_scalar = (self.shape_rgb[0], self.shape_rgb[1], 1)
-#
-#         self.logger = log.setup_logger("merger")
-#
-#         # currently processed frame
-#         self.frame_no = 0
-#
-#         # FIFOs = First in first out: Keep copies of the last n frames
-#         self.fifo_frame = collections.deque(maxlen=fifo_length)
-#         self.fifo_mean = collections.deque(maxlen=fifo_length)
-#         self.fifo_diff = collections.deque(maxlen=fifo_length)
-#         self.fifo_metric = collections.deque(maxlen=fifo_length)
-#         self.fifo_merged = collections.deque(maxlen=fifo_length)
-#
-#
-#         # Sums
-#         self.sum_metric = np.zeros(self.shape_scalar)
-#         self.sum_layers = np.zeros(self.shape_scalar)
-#
-#         # Config
-#         self.save_diff = False
-#         self.save_mean = True
-#         self.save_metric = False
+            self.preview_image(merge, "final")
