@@ -107,17 +107,8 @@ class SimpleMerger(Merger):
         """
         super().__init__(inpt, config)
 
-        # preprocess options:
-
-        # todo: put in one config object/config file
-        # options: mean, single, patched
+        # todo: put in config
         self.mean_strategy = "patched"
-
-        # ** How to convert rgb diff to sclar metric? **
-        # options: R3
-
-        # ** Layer (e.g. frame * metric) **
-        # Options: normal, overlay
         self.layer_strategy = "normal"
 
     def calc_mean(self) -> np.ndarray:
@@ -235,6 +226,7 @@ class SimpleMerger(Merger):
         sum_metric = np.zeros(shape=self._shape_scalar, dtype=float)
         sum_layer = np.zeros(shape=self._shape_rgb, dtype=float)
         start_time = time.time()
+
         for index, frame in enumerate(self._input.get_frames()):
 
             if index >= 1:
@@ -250,6 +242,7 @@ class SimpleMerger(Merger):
             diff = self.calc_diff(mean, frame)
             metric = self.calc_metric(diff)
             layer = frame * metric
+
             sum_metric += metric
 
             if self.layer_strategy == "overlay":
@@ -261,7 +254,8 @@ class SimpleMerger(Merger):
                 sum_layer += layer
 
             if "merge" in self.preview or "merge" in self.save:
-                merge = self.calc_merge(sum_metric, sum_layer)
+                merge = self.calc_merge(sum_layer, sum_metric)
+
 
             # ** Save/Preview **
 
