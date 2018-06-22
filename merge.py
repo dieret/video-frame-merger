@@ -60,7 +60,8 @@ if __name__ == "__main__":
         nargs="+",
         default=[],
         help="Set parameters of your merger. Give strings like "
-             "<param_name>=<param_value>."
+             "<param_name>=<param_value>. Note: If you want to pass a string, "
+             "use quotation marks, e.g. param='blah'"
     )
 
     args = parser.parse_args()
