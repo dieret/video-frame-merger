@@ -27,7 +27,8 @@ class Merger(object):
         self.save = self._config["m"]["save"]
         # live preview
         self.preview = self._config["m"]["preview"]
-        self.preview_max_size = (500, None)  # height, width
+
+        self.preview_max_size = self._config["m"]["preview_max_size"]
 
         # For convenience:
         self._shape_rgb = inpt.shape  # height x width x 3
@@ -200,7 +201,8 @@ class SimpleMerger(Merger):
             # todo: options for canny as class variable
             gray = metric * 255
             gray = gray.reshape(self._shape).astype(np.uint8)
-            edges = cv2.Canny(gray, 100, 200)
+            edges = cv2.Canny(gray, conf["edge"]["canny1"],
+                              conf["edge"]["canny2"])
             edges = edges.astype(np.float)
             metric = edges
 

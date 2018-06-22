@@ -9,7 +9,7 @@ import validate
 import pylib.log as log
 import os.path
 import logging
-from typing import List, Any, Union
+from typing import List, Any
 
 
 def get_cli_options(logger: logging.Logger):
