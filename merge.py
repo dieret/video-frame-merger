@@ -8,9 +8,12 @@ import configobj
 import validate
 import pylib.log as log
 import os.path
+import logging
+from typing import List, Any
 
 
-def get_cli_options(logger):
+def get_cli_options(logger: logging.Logger):
+    """ Return command line options. """
     logger.debug("Parsing command line options.")
     parser = argparse.ArgumentParser()
 
@@ -24,7 +27,7 @@ def get_cli_options(logger):
         "-c",
         "--config",
         default=None,
-        help="Config file."
+        help="Path to config file."
     )
     parser.add_argument(
         "-i",
@@ -78,7 +81,7 @@ def get_cli_options(logger):
     return parser.parse_args()
 
 
-def load_config_file(path, logger):
+def load_config_file(path: str, logger: logging.Logger) -> configobj.ConfigObj:
     if path and not os.path.exists(args.config):
         logger.error("Config file '{}' does not exist. Falling back to "
                      "default.".format(args.config))
@@ -124,7 +127,9 @@ def load_config_file(path, logger):
     return config
 
 
-def interpret_setter(string, logger):
+def interpret_setter(string: str, logger: logging.Logger) -> (List[str], Any):
+    """ Interpret strings such as 'sec1.mykey=5' bt splitting them up in a key 
+    and a evaluated value (float, int, string or list thereof). """
     if not string.count("=") == 1:
         logger.error("Do you want to set a parameter with '{}'? If so, "
                      "this should have exactly one '='!")
@@ -152,10 +157,14 @@ def interpret_setter(string, logger):
         except ValueError:
             value_evaluated = value_str
 
-    return (keys, value_evaluated)
+    return keys, value_evaluated
 
 
-def set_config_option(config, path, value, logger):
+def set_config_option(config: configobj.ConfigObj, path: List[str], value: Any,
+                      logger: logging.Logger):
+    """ Example: set_config_option(config, ['sec1', 'sec2', 'key'], 5, logger) 
+    will do config['sec1']['sec2']['key'] = 5 and return the new config 
+    object. """
     this_config = config
     _path = ""
     for key in path[:-1]:
