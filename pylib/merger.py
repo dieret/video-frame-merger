@@ -42,6 +42,11 @@ class Merger(object):
         raise NotImplementedError
 
     def preview_image(self, image, name="image"):
+        # convert to grayscale if needed
+        if len(image.shape) == 2 or \
+                (len(image.shape) == 3 and image.shape[2] == 1):
+            image = self.scalar_to_grayscale(image)
+
         new_size = util.new_size(image.shape, self.preview_max_size)
 
         # Note that cv2.imshow has trouble with floats as image type, so cast
@@ -79,6 +84,10 @@ class Merger(object):
 
     @staticmethod
     def scalar_to_grayscale(scalar):
+        assert(2<= len(scalar.shape) <= 3)
+        if scalar.shape == 2:
+            scalar = scalar.reshape((*scalar.shape, 1))
+        assert(len(scalar.shape) == 3 and scalar.shape[2] == 1)
         normed = scalar / scalar.max() * 255
         return np.concatenate((normed, normed, normed), 2)
 
@@ -252,28 +261,31 @@ class SimpleMerger(Merger):
             if "merge" in self.preview or "merge" in self.save:
                 merge = self.calc_merge(sum_metric, sum_layer)
 
-            # ** saving **
+            # ** Save/Preview **
 
-            if "frame" in self.save:
-                self.save_image(frame, "frame", index)
-            if "diff" in self.save:
-                self.save_image(diff, "diff", index)
-            if "metric" in self.save:
-                self.save_image(self.scalar_to_grayscale(metric),
-                                "metric", index)
-            if "merge" in self.save:
-                self.save_image(merge, "merge", index)
+            allowed = ["frame", "diff", "metric", "layer", "sum_metric",
+                       "sum_layer", "merge", "final"]
 
-            # ** previews **
+            for item in self.save:
+                if item == "final":
+                    continue
+                if item not in allowed:
+                    self._logger.error(
+                        "Invalid value for save: '{}'. "
+                        "Skipping this for now.".format(item))
+                    continue
+                self.save_image(locals()[item], item, index)
 
-            if "frame" in self.preview:
-                self.preview_image(frame, "frame")
-            if "diff" in self.preview:
-                self.preview_image(diff, "diff")
-            if "metric" in self.preview:
-                self.preview_image(self.scalar_to_grayscale(metric), "metric")
-            if "merge" in self.preview:
-                self.preview_image(merge, "merge")
+            for item in self.preview:
+                if item == "final":
+                    continue
+                if item not in allowed:
+                    self._logger.error(
+                        "Invalid value for preview: '{}'. "
+                        "Skipping this for now.".format(item))
+                    continue
+                self.preview_image(locals()[item], item)
+
 
         if "final" in self.save or "final" in self.preview:
             merge = self.calc_merge(sum_layer, sum_metric)
