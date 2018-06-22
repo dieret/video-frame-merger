@@ -107,24 +107,20 @@ class SimpleMerger(Merger):
         """
         super().__init__(inpt, config)
 
-        # todo: put in config
-        self.mean_strategy = "patched"
-        self.layer_strategy = "normal"
-
     def calc_mean(self) -> np.ndarray:
-        if self.mean_strategy == "mean":
+        conf = self._config["m"]["mean"]
+        if conf["strategy"] == "mean":
             return sum(self._input.get_frames()) / self._input.number_images
 
-        elif self.mean_strategy == "single":
+        elif conf["strategy"]  == "single":
             # return first frame
-            for frame in self._input.get_frames():
-                return frame
+            return self._input.get_frame(conf["single"]["no"])
 
-        elif self.mean_strategy == "patched":
+        elif conf["strategy"] == "patched":
             width = self._input.shape[1]
-            width_left = int(width/2)
-            left = self._input.get_frame(-1)[:, :width_left, :]
-            right = self._input.get_frame(0)[:, width_left:, :]
+            width_left = int(width*conf["patched"]["fraction"])
+            left = self._input.get_frame(conf["patched"]["no1"])[:, :width_left, :]
+            right = self._input.get_frame(conf["patched"]["no2"])[:, width_left:, :]
             return np.concatenate((left, right), axis=1)
 
         else:
@@ -189,7 +185,6 @@ class SimpleMerger(Merger):
             )
 
         if "edge" in conf["operations"]:
-            # todo: options for canny as class variable
             gray = metric * 255
             gray = gray.reshape(self._shape).astype(np.uint8)
             edges = cv2.Canny(gray, conf["edge"]["canny1"],
@@ -197,16 +192,22 @@ class SimpleMerger(Merger):
             edges = edges.astype(np.float)
             metric = edges
 
+        # todo: options to clear speccles
+
         # normalize metric
         metric /= metric.max()
 
         return metric
 
     def calc_merge(self, sum_layer: np.ndarray, sum_metric: np.ndarray) -> np.ndarray:
-        if self.layer_strategy == "overlay":
+        conf = self._config["m"]["layer"]
+
+        if conf["strategy"] == "overlay":
             merge = sum_layer
-        else:
+        elif conf["strategy"] == "add":
             merge = sum_layer/sum_metric
+        else:
+            raise ValueError("Unknown parameter.")
 
         # Convert to uint8
         merge[merge < 0.] = 0.
@@ -245,7 +246,7 @@ class SimpleMerger(Merger):
 
             sum_metric += metric
 
-            if self.layer_strategy == "overlay":
+            if self._config["m"]["layer"]["strategy"] == "overlay":
                 if index == 0:
                     sum_layer = frame
                 else:
@@ -255,7 +256,6 @@ class SimpleMerger(Merger):
 
             if "merge" in self.preview or "merge" in self.save:
                 merge = self.calc_merge(sum_layer, sum_metric)
-
 
             # ** Save/Preview **
 
