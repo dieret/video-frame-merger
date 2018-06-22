@@ -6,6 +6,7 @@ import os.path
 import os
 import cv2
 import time
+from . import util
 
 
 class Merger(object):
@@ -24,6 +25,7 @@ class Merger(object):
         self.save = []
         # live preview
         self.preview = []
+        self.preview_max_size = (500, None)  # height, width
 
         # For convenience:
         self._shape_rgb = inpt.shape  # height x width x 3
@@ -40,28 +42,11 @@ class Merger(object):
     def preview_image(self, image, name="image", max_height=500, max_width=None):
 
         # ** determine size to be displayed **
-        old_height, old_width, _ = image.shape
-        if max_width and max_height:
-            new_size = (max_height, max_width)
-        elif max_width:
-            if max_width >= old_width:
-                new_size = (old_height, old_width)
-            else:
-                scale = max_width/old_width
-                new_size = (scale * old_height, scale * old_width)
-        elif max_height:
-            if max_height >= old_height:
-                new_size = (old_height, old_width)
-            else:
-                scale = max_height/old_height
-                new_size = (scale * old_height, scale * old_width)
-        else:
-            new_size = (old_height, old_width)
-        new_size = (int(new_size[0]), int(new_size[1]))
+        new_size = util.new_size(image.shape, self.preview_max_size)
 
         # ** resize **
         # Note that cv2.imshow has trouble with floats as image type, so cast it!
-        resized = cv2.resize(image, (new_size[1], new_size[0])).astype(np.uint8)
+        resized = cv2.resize(image, (int(new_size[1]), int(new_size[0]))).astype(np.uint8)
 
         # ** display **
         # Note: waitKey(1) waits 1ms, waitKey(0) actually waits for key
