@@ -9,9 +9,9 @@ import validate
 import pylib.log as log
 import os.path
 
-if __name__ == "__main__":
-    logger = log.setup_logger("main")
 
+def get_cli_options(logger):
+    logger.debug("Parsing command line options.")
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
@@ -64,7 +64,9 @@ if __name__ == "__main__":
         nargs="+",
         default=[],
         help="Set parameters of your merger. Give strings like "
-             "<param_name>=<param_value>. To give a list of values, make sure "
+             "<param_name>=<param_value>. "
+             "To specify subsections, use '.', e.g. 'section1.section2.key'. "
+             "To give a list of values, make sure "
              "param_value contains a ',', even when passing only one value, "
              "e.g. 'key=value,'. When passing multiple list members, so "
              "key=value1,value2."
@@ -73,18 +75,17 @@ if __name__ == "__main__":
              "take it as a string."
     )
 
-    logger.debug("Parsing command line options.")
-    args = parser.parse_args()
+    return parser.parse_args()
 
-    # with open("configspec.config") as configspec_file:
-    #     configspec = configspec_file.readlines()
 
-    if args.config and not os.path.exists(args.config):
+def load_config_file(path, logger):
+    if path and not os.path.exists(args.config):
         logger.error("Config file '{}' does not exist. Falling back to "
                      "default.".format(args.config))
         args.config = "tmp.config"
 
     logger.debug("Loading config file.")
+
     try:
         config = configobj.ConfigObj(args.config,
                                      configspec="configspec.config")
@@ -101,8 +102,8 @@ if __name__ == "__main__":
     # adapted from https://stackoverflow.com/questions/14345879/
     # answer from user sgt_pats 2017
     for entry in configobj.flatten_errors(config, valid):
-        [sectionList, key, error] = entry
-        if error == False:
+        [_, key, error] = entry
+        if not error:
             msg = "The parameter {} was not in the config file\n".format(key)
             msg += "Please check to make sure this parameter is present and " \
                    "there are no mis-spellings."
@@ -120,6 +121,63 @@ if __name__ == "__main__":
 
         raise ValueError("Unknown error with validation.")
 
+    return config
+
+
+def interpret_setter(string, logger):
+    if not string.count("=") == 1:
+        logger.error("Do you want to set a parameter with '{}'? If so, "
+                     "this should have exactly one '='!")
+        raise ValueError
+
+    keys, value_str = string.split("=")
+    keys = keys.strip()
+    value_str = value_str.strip()
+
+    if "," in value_str:
+        # assuming this is a list
+        value_evaluated = []
+        for s in value_str.split(","):
+            s = s.strip()
+            if not s:
+                continue
+            try:
+                v = float(s) if '.' in s else int(s)
+            except ValueError:
+                v = s
+            value_evaluated.append(v)
+    else:
+        try:
+            value_evaluated = float(value_str) if '.' in value_str else int(value_str)
+        except ValueError:
+            value_evaluated = value_str
+
+    return (keys, value_evaluated)
+
+
+def set_config_option(config, path, value, logger):
+    this_config = config
+    _path = ""
+    for key in path[:-1]:
+        _path += "/" + key
+        try:
+            this_config = this_config[key]
+        except KeyError:
+            logger.error("The config item '{}' does not "
+                         "seem to exist.".format("/".join(keys)))
+            raise ValueError
+    this_config[path[-1]] = value
+    logger.debug("Setting config item '{}' to value '{}' ({})".format(
+            '/'.join(path), value_evaluated, type(value_evaluated)))
+    return config
+
+
+if __name__ == "__main__":
+    logger = log.setup_logger("main")
+
+    args = get_cli_options(logger)
+    config = load_config_file(args.config, logger)
+
     logger.debug("Setting cli options to config file.")
     if args.save is not None:
         config["m"]["save"] = args.save
@@ -130,58 +188,26 @@ if __name__ == "__main__":
 
     logger.debug("Checking for -p/--parameter options.")
 
-    for param_value_pair in args.parameter:
-        if not param_value_pair.count("=") == 1:
-            logger.error("Do you want to set a parameter with '{}'? If so, "
-                         "this should have exactly one '='! "
-                         "Skipping this for now.")
+    for string in args.parameter:
+        try:
+            keys, value_evaluated = interpret_setter(string, logger)
+        except ValueError:
+            logger.error("Skipping this issue for now.")
             continue
-
-        keys, value_str = param_value_pair.split("=")
-        keys = keys.strip().split(".")
-        value_str = value_str.strip()
-
-        if "," in value_str:
-            # assuming this is a list
-            value_evaluated = []
-            for s in value_str.split(","):
-                s = s.strip()
-                if not s:
-                    continue
-                try:
-                    v = float(s) if '.' in s else int(s)
-                except ValueError:
-                    v = s
-                value_evaluated.append(v)
-        else:
-            try:
-                value_evaluated = float(value_str) if '.' in value_str else int(value_str)
-            except ValueError:
-                value_evaluated = value_str
-
-        this_config = config
-        path = ""
-        fail = False
-        for key in keys[:-1]:
-            path += "/" + key
-            try:
-                this_config = this_config[key]
-            except KeyError:
-                logger.error("The config item '{}' does not seem to exist. "
-                             "Skipping this for now.".format("/".join(keys)))
-                fail = True
-                break
-        this_config[keys[-1]] = value_evaluated
-
-        if fail:
+        path = keys.split(".")
+        try:
+            config = set_config_option(config, path, value_evaluated, logger)
+        except ValueError:
+            logger.error("Skipping this issue for now.")
             continue
-
-        logger.debug("Setting config item '{}' to value '{}'='{}' ({})".format(
-            '/'.join(keys), value_str, value_evaluated, type(value_evaluated)))
 
     logger.debug("Validating config file again")
     valid = config.validate(validate.Validator(), preserve_errors=True,
                             copy=True)
+
+    logger.info("Saving config file to tmp.config.")
+    config.filename = "tmp.config"
+    config.write()
 
     if args.iterator != "SingleFramesIterator":
         assert(len(args.input_path)) == 1
@@ -189,7 +215,5 @@ if __name__ == "__main__":
 
     i = inputdata.InputData(args.input_path, getattr(inputdata, args.iterator))
     m = merger.SimpleMerger(i, config)
-
-
 
     m.run()

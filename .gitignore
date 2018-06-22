@@ -11,7 +11,7 @@ __pycache__/**
 *.pyc
 
 
-out.config
+*.config
 
 # incase symlink
 data/untracked 
