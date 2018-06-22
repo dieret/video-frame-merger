@@ -44,7 +44,7 @@ if __name__ == "__main__":
         "--save",
         type=str,
         nargs="+",
-        default=["final"],
+        default=None,
         choices=["frame", "mean", "diff", "metric", "merge", "final"],
         help="Which steps to save."
     )
@@ -53,17 +53,9 @@ if __name__ == "__main__":
         "--preview",
         type=str,
         nargs="+",
-        default=["final"],
+        default=None,
         choices=["frame", "mean", "diff", "metric", "merge", "final"],
         help="Which steps to preview."
-    )
-    parser.add_argument(
-        "-m",
-        "--merger",
-        default="SimpleMerger",
-        help="Merger. This is what actually merges all frames. "
-             "Default: SimpleMerger.",
-        choices=util.get_all_subclasses_names(merger.Merger)
     )
     parser.add_argument(
         "-p",
@@ -72,8 +64,13 @@ if __name__ == "__main__":
         nargs="+",
         default=[],
         help="Set parameters of your merger. Give strings like "
-             "<param_name>=<param_value>. Note: If you want to pass a string, "
-             "use quotation marks, e.g. param='blah'"
+             "<param_name>=<param_value>. To give a list of values, make sure "
+             "param_value contains a ',', even when passing only one value, "
+             "e.g. 'key=value,'. When passing multiple list members, so "
+             "key=value1,value2."
+             "We will try to convert each value to"
+             " a float (if it contains a dot) or an int. If both fail, we "
+             "take it as a string."
     )
 
     logger.debug("Parsing command line options.")
@@ -83,52 +80,116 @@ if __name__ == "__main__":
     #     configspec = configspec_file.readlines()
 
     if args.config and not os.path.exists(args.config):
-        logger.error("Config file '{}' does not exist. Falling back to default.".format(
-            args.config))
+        logger.error("Config file '{}' does not exist. Falling back to "
+                     "default.".format(args.config))
         args.config = "tmp.config"
 
-    logger.debug("Parsing config file.")
+    logger.debug("Loading config file.")
     try:
-        config = configobj.ConfigObj(args.config, configspec="configspec.config")
+        config = configobj.ConfigObj(args.config,
+                                     configspec="configspec.config")
     except:
         msg = "Some error occurred during reading of config file. " \
               "Aborting now."
         logger.critical(msg)
         raise ValueError
 
-    valid = config.validate(validate.Validator())
-    config.filename = "out.config"
-    config.write()
+    logger.debug("Validating config file.")
+    valid = config.validate(validate.Validator(), preserve_errors=True,
+                            copy=True)
 
-    print(config)
-    if not valid:
-        msg = "Config file validation failed."
-        logger.critical(msg)
-        raise ValueError(msg)
+    # adapted from https://stackoverflow.com/questions/14345879/
+    # answer from user sgt_pats 2017
+    for entry in configobj.flatten_errors(config, valid):
+        [sectionList, key, error] = entry
+        if error == False:
+            msg = "The parameter {} was not in the config file\n".format(key)
+            msg += "Please check to make sure this parameter is present and " \
+                   "there are no mis-spellings."
+            logger.critical(msg)
+            raise ValueError(msg)
+
+        if key is not None:
+            if isinstance(error, validate.VdtValueError):
+                optionString = config.configspec[key]
+                msg = "The parameter {} was set to {} which is not one of " \
+                      "the allowed values\n".format(key, config[key])
+                msg += "Please set the value to be in {}".format(optionString)
+                logger.critical(msg)
+                raise ValueError(msg)
+
+        raise ValueError("Unknown error with validation.")
+
+    logger.debug("Setting cli options to config file.")
+    if args.save is not None:
+        config["m"]["save"] = args.save
+    if args.preview is not None:
+        config["m"]["preview"] = args.preview
+    if args.name:
+        config["m"].name = args.name
+
+    logger.debug("Checking for -p/--parameter options.")
+
+    for param_value_pair in args.parameter:
+        if not param_value_pair.count("=") == 1:
+            logger.error("Do you want to set a parameter with '{}'? If so, "
+                         "this should have exactly one '='! "
+                         "Skipping this for now.")
+            continue
+
+        keys, value_str = param_value_pair.split("=")
+        keys = keys.strip().split(".")
+        value_str = value_str.strip()
+
+        if "," in value_str:
+            # assuming this is a list
+            value_evaluated = []
+            for s in value_str.split(","):
+                s = s.strip()
+                if not s:
+                    continue
+                try:
+                    v = float(s) if '.' in s else int(s)
+                except ValueError:
+                    v = s
+                value_evaluated.append(v)
+        else:
+            try:
+                value_evaluated = float(value_str) if '.' in value_str else int(value_str)
+            except ValueError:
+                value_evaluated = value_str
+
+        this_config = config
+        path = ""
+        fail = False
+        for key in keys[:-1]:
+            path += "/" + key
+            try:
+                this_config = this_config[key]
+            except KeyError:
+                logger.error("The config item '{}' does not seem to exist. "
+                             "Skipping this for now.".format("/".join(keys)))
+                fail = True
+                break
+        this_config[keys[-1]] = value_evaluated
+
+        if fail:
+            continue
+
+        logger.debug("Setting config item '{}' to value '{}'='{}' ({})".format(
+            '/'.join(keys), value_str, value_evaluated, type(value_evaluated)))
+
+    logger.debug("Validating config file again")
+    valid = config.validate(validate.Validator(), preserve_errors=True,
+                            copy=True)
 
     if args.iterator != "SingleFramesIterator":
         assert(len(args.input_path)) == 1
         args.input_path = args.input_path[0]
 
     i = inputdata.InputData(args.input_path, getattr(inputdata, args.iterator))
-    m = getattr(merger, args.merger)(i, config)
+    m = merger.SimpleMerger(i, config)
 
-    # todo: rather implement with config
-    m.save = args.save
-    m.preview = args.preview
 
-    # todo: implement with config
-    if args.name:
-        m.name = args.name
-
-    # todo: implement with config
-    for param_value_pair in args.parameter:
-        assert(param_value_pair.count("=") == 1)
-        key, value = param_value_pair.split("=")
-        key = key.strip()
-        value = value.strip()
-        logger.debug("Setting key '{}' to value '{}'='{}'".format(
-            key, value, eval(value)))
-        setattr(m, key, eval(value))
 
     m.run()
