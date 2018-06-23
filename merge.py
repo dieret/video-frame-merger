@@ -133,7 +133,6 @@ def validate_config_file(config: configobj.ConfigObj,
     for entry in configobj.flatten_errors(config, valid):
         [path, key, error] = entry
         if not error:
-            print("here1")
             msg = "The parameter {} was not in the config file\n".format(key)
             msg += "Please check to make sure this parameter is present and " \
                    "there are no mis-spellings."
@@ -201,6 +200,9 @@ def interpret_setter(string: str, logger: logging.Logger) -> (List[str], str, An
 
     path = keys.split(".")
 
+    logger.debug("Path='{}', setter='{}', value='{}'.".format(
+        path, setter, value_evaluated))
+
     return path, setter, value_evaluated
 
 
@@ -257,8 +259,8 @@ def set_config_option(config: configobj.ConfigObj, path: List[str],
         logger.critical(msg)
         raise ValueError(msg)
 
-    logger.debug("Setting config item '{}' to value '{}' ({})".format(
-            '/'.join(path), value_evaluated, type(value_evaluated)))
+    logger.debug("Set config item '{}' to value '{}' ({})".format(
+            '/'.join(path), this_config[path[-1]], type(this_config[path[-1]])))
     return config
 
 
