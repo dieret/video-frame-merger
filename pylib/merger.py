@@ -113,7 +113,7 @@ class SimpleMerger(Merger):
         if conf["strategy"] == "mean":
             return sum(self._input.get_frames()) / self._input.number_images
 
-        elif conf["strategy"]  == "single":
+        elif conf["strategy"] == "single":
             # return first frame
             return self._input.get_frame(conf["single"]["no"])
 
@@ -274,7 +274,7 @@ class SimpleMerger(Merger):
             else:
                 fps=0
 
-            self._logger.debug("Processing frame {:04} (fps: {:02.2f})".format(
+            self._logger.info("Processing frame {:04} (fps: {:02.2f})".format(
                 index, fps))
 
             # ** calculations **

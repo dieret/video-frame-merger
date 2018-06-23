@@ -36,8 +36,7 @@ class InputData(object):
 
     def get_frame(self, index):
         if index < 0:
-            # fixme: why the -2
-            index = self.number_images - index - 2
+            index = self.number_images - abs(index)
         return self._frame_iterator.get_frame(index)
 
     @property
@@ -108,6 +107,16 @@ class FrameIterator(object):
     def fps(self):
         return 1.
 
+    def get_frame_manually(self, index):
+        # e.g. for gifs that do not support cv2.CAP_PROP_POS_FRAMES
+        assert(index >= 0)
+        num = 0
+        self.rewind()
+        while num <= index:
+            frame = self.get_frame()
+            num += 1
+        return frame
+
     def number_images_manual(self):
         num = 0
         self.rewind()
@@ -140,21 +149,38 @@ class VideoFrameIterator(FrameIterator):
         self.opened = cv2.VideoCapture(self.path)
 
     def get_frame(self, index=None):
-        if not index:
+        if index is None:
+            # Explicitly test for None, because index=0 doesn't belong here!
             okay, frame = self.opened.read()
             if not okay:
+                self.logger.debug("Frame is none!")
                 return None
             self.index += 1
         else:
+            self.logger.debug("Frame {} (count from 0) requested.".format(index))
             if 0 <= index < self.number_images:
                 self.opened.set(cv2.CAP_PROP_POS_FRAMES, index)
                 okay, frame = self.opened.read()
                 if not okay:
-                    return None
+                    msg = "Getting frame {} automatically failed (e.g. " \
+                          "common for gifs). Going the long way and " \
+                          "reading the file from start until we reach the" \
+                          "frame. This might be slow. ".format(index)
+                    self.logger.warning(msg)
+                    frame = self.get_frame_manually(index)
                 self.opened.set(cv2.CAP_PROP_POS_FRAMES, self.index)
             else:
-                self.logger.error("Out of range!")
+                msg = "Out of range: Condition {} <= index = {} < {} " \
+                      "failed!".format(0, index, self.number_images)
+                self.logger.error(msg)
                 return None
+
+            if frame is None:
+                msg = "Failed to get frame {} (counting from 0)!".format(index)
+                self.logger.warning(msg)
+            else:
+                msg = "Successfully got frame {} (counting from 0).".format(index)
+                self.logger.debug(msg)
 
         # note: cv2.imread returns us an array in int8, so we need to
         # convert that.
@@ -163,14 +189,18 @@ class VideoFrameIterator(FrameIterator):
 
         return frame
 
+
+
     @property
     def number_images(self):
         if self._number_images is None:
             self._number_images = int(self.opened.get(cv2.CAP_PROP_FRAME_COUNT))
             if not (0 < self._number_images < 1e6):
                 # (for gifs)
-                self.logger.warning("Automatic retrieval of number of frames "
-                                    "failed. Counting manually.")
+                msg = "Automatic retrieval of number of frames failed. " \
+                      "(e.g. happens for gifs). Counting by going through " \
+                      "the whole file. This might be slow."
+                self.logger.warning(msg)
                 self._number_images = self.number_images_manual()
             self.logger.debug("Updated number images to {}.".format(self._number_images))
         return self._number_images
