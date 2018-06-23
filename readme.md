@@ -36,7 +36,7 @@ the ``r.config.copy_all`` option).
 
 Supply one or more option with the ``-p`` (``--parameter``) option:
 
-    ./merge.py -p <key/value pair 1> <key value pair 2>
+    -p <key/value pair 1> <key value pair 2>
     
 **Important:** Only use ``-p`` once! Do ``-p <key/value pair 1> <key value pair 2>`` 
 instead of ``-p <key/value pair 1> -p <key value pair 2>``. 
@@ -71,9 +71,15 @@ Here are some examples:
 
 ## Examples
 
+All of those examples can be run at once with the ``run_examples.sh`` script.
+Note: This will run all lines starting with ``./merge.py -n examples/``, so be 
+careful that those also always run.
+
 ## Default
 
-    ./merge.py data/giflibrary/fencers.gif
+    ./merge.py -n examples/default data/giflibrary/fencers.gif 
+    
+    ./merge.py data/untracked/rad.mp4 -v metric merge
 
 ### Merging with simple R3 metric
 
@@ -81,17 +87,17 @@ Note: Applying a cutoff is a standard now, so we need to actively specify
 the operations applied to the metric to remove it. Here we only apply a
 small blur on the (R3) metric.
 
+    ./merge.py -n examples/r3metric data/giflibrary/fencers.gif -v metric merge -p m.mpp.operations=gauss,
+    
     ./merge.py data/untracked/rad.mp4 -v metric merge -p m.mpp.operations=gauss,
-
-Alternatively, we could have also just removed ``cutoff`` from the 
-operations by using ``-p`` with the ``-=`` syntax.
-
-    ./merge.py data/untracked/rad.mp4 -v metric merge -p m.mpp.operations-=cutoff,
 
 
 ### Cutoff merging
 
-    ./merge.py data/untracked/rad.mp4 -v metric merge m.mpp.cutoff.min=0.0001
+    ./merge.py -n examples/cutoff data/giflibrary/fencers.gif -v metric merge -p m.mpp.cutoff.min=0.0001
+    
+    ./merge.py data/untracked/rad.mp4 -v metric merge -p m.mpp.cutoff.min=0.0001
+
  
 This is using the default overlay (``m.overlay.strategy=add``). 
 Set ``m.mpp.cutoff.min`` to a small number, e.g. ``0.1/number frames``. 
@@ -101,15 +107,19 @@ It must be mon zero, because else our background becomes black.
 
 Note: If we want the overlay to not fade, we need to set ``m/mpp/cutoff/min`` to zero.
 
-    ./merge.py data/untracked/rad.mp4 -v metric merge m.mpp.cutoff.min=0 m.overlay.strategy=overlay 
+    ./merge.py -n examples/overlay data/giflibrary/fencers.gif -v merge -s final merge -p m.mpp.cutoff.min=0 m.overlay.strategy=overlay 
     
 If we want thad fade effect, e.g. run 
 
-    ./merge.py data/untracked/rad.mp4 -v metric merge m.mpp.cutoff.min=0.1 m.overlay.strategy=overlay 
+    ./merge.py data/untracked/rad.mp4 -v metric merge -p m.mpp.cutoff.min=0.1 m.overlay.strategy=overlay 
+
+    ./merge.py -n examples/overlay2 data/giflibrary/fencers.gif -s merge -v metric merge -p m.mpp.cutoff.min=0.1 m.overlay.strategy=overlay 
     
 Or for a slightly slower fading ``mp.mpp.cutoff.min=0.05``.
 
 ### White grid lines
+
+    ./merge.py -n examples/whitegrid data/giflibrary/fencers.gif -v metric merge -p m.diff.operations=, m.mpp.operations=gauss,cutoff,edge m.overlay.strategy=overlay m.layer.multiply=100
 
     ./merge.py data/untracked/rad.mp4 -v metric merge -p m.diff.operations=, m.mpp.operations=gauss,cutoff,edge,open,dilate m.mpp.dilate.kernel=2,2  m.mpp.open.kernel=5,5 m.overlay.strategy=overlay m.layer.multiply=100
 

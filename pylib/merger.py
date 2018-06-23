@@ -162,7 +162,9 @@ class SimpleMerger(Merger):
         metric += conf["zero"]
 
         # normalize metric
-        metric /= metric.max()
+        mm = metric.max()
+        if mm != 0:
+            metric /= mm
 
         metric = self.calc_metric_postprocessing(metric)
         shape = (diff.shape[0], diff.shape[1], 1)
@@ -215,7 +217,9 @@ class SimpleMerger(Merger):
             metric = cv2.dilate(metric, kernel)
 
         # normalize metric
-        metric /= metric.max()
+        mm = metric.max()
+        if mm != 0:
+            metric /= mm
 
         return metric
 
@@ -234,7 +238,7 @@ class SimpleMerger(Merger):
         # todo: add normalization option
 
         # Convert to uint8
-        merge[merge < 0.] = 0.
+        merge[merge <= 0] = 0
         merge = merge.astype(np.uint8)
         return merge
 
@@ -253,7 +257,7 @@ class SimpleMerger(Merger):
                                       *conf["gauss"]["sigmas"])
 
         # todo: add normalization option
-        layer[layer > 255.] = 255.
+        layer[layer > 255] = 255
         return layer
 
     def run(self):

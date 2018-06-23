@@ -275,8 +275,6 @@ if __name__ == "__main__":
         config["m"]["save"] = args.save
     if args.preview is not None:
         config["m"]["preview"] = args.preview
-    if args.name:
-        config["m"].name = args.name
 
     logger.debug("Checking for -p/--parameter options.")
 
@@ -313,6 +311,8 @@ if __name__ == "__main__":
 
     logger.debug("Init merger.")
     m = merger.SimpleMerger(i, config)
+    if args.name:
+        m.name = args.name
 
     logger.debug("Run! Here we go!")
     m.run()
