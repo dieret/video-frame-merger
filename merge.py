@@ -73,7 +73,8 @@ def get_cli_options(logger: logging.Logger):
              "key=value1,value2."
              "We will try to convert each value to"
              " a float (if it contains a dot) or an int. If both fail, we "
-             "take it as a string."
+             "take it as a string. For lists, you can also write '+=' or '-=' "
+             "to add or remove values from the list. "
     )
 
     return parser.parse_args()
@@ -135,7 +136,7 @@ def validate_config_file(config: configobj.ConfigObj,
     return config
 
 
-def interpret_setter(string: str, logger: logging.Logger) -> (List[str], Any):
+def interpret_setter(string: str, logger: logging.Logger) -> (List[str], str, Any):
     """ Interpret strings such as 'sec1.mykey=5' bt splitting them up in a key 
     and a evaluated value (float, int, string or list thereof). """
     if not string.count("=") == 1:
@@ -145,6 +146,16 @@ def interpret_setter(string: str, logger: logging.Logger) -> (List[str], Any):
 
     keys, value_str = string.split("=")
     keys = keys.strip()
+
+    if keys.endswith("+"):
+        keys = keys[:-1]
+        setter = "+"
+    elif keys.endswith("-"):
+        keys = keys[:-1]
+        setter = "-"
+    else:
+        setter = "="
+
     value_str = value_str.strip()
 
     if "," in value_str:
@@ -165,11 +176,13 @@ def interpret_setter(string: str, logger: logging.Logger) -> (List[str], Any):
         except ValueError:
             value_evaluated = value_str
 
-    return keys, value_evaluated
+    path = keys.split(".")
+
+    return path, setter, value_evaluated
 
 
-def set_config_option(config: configobj.ConfigObj, path: List[str], value: Any,
-                      logger: logging.Logger):
+def set_config_option(config: configobj.ConfigObj, path: List[str],
+                      setter: str, value: Any, logger: logging.Logger):
     """ Example: set_config_option(config, ['sec1', 'sec2', 'key'], 5, logger) 
     will do config['sec1']['sec2']['key'] = 5 and return the new config 
     object. """
@@ -180,10 +193,46 @@ def set_config_option(config: configobj.ConfigObj, path: List[str], value: Any,
         try:
             this_config = this_config[key]
         except KeyError:
-            logger.error("The config item '{}' does not "
-                         "seem to exist.".format(_path))
+            msg = "The config item '{}' does not seem to exist.".format(_path)
+            logger.error(msg)
             raise ValueError
-    this_config[path[-1]] = value
+    previous_value = this_config[path[-1]]
+    if setter == "=":
+        this_config[path[-1]] = value
+    elif setter in ["+", "-"]:
+        if not isinstance(value, list):
+            msg = "Since you are using '+=' or '-=' with the -p/--parameter" \
+                  " option, it looks like you want to add/remove an item " \
+                  "from default value. However the default value is not a " \
+                  "list! "
+            logger.error(msg)
+            raise ValueError(msg)
+        if setter == "+":
+            for v in value:
+                if v in previous_value:
+                    msg = "Since you are using '+=' with the -p/--parameter" \
+                          " option, it looks like you want to add an item " \
+                          "from default value. However the default value " \
+                          "already contains your value '{}'!".format(v)
+                    logger.warning(msg)
+                else:
+                    this_config[path[-1]].append(v)
+        if setter == "-":
+            for v in value:
+                if not v in previous_value:
+                    msg = "Since you are using '-=' with the -p/--parameter" \
+                          " option, it looks like you want to remove an item " \
+                          "from default value. However the default value " \
+                          "does not even contain your value '{}'!".format(v)
+                    logger.warning(msg)
+                else:
+                    this_config[path[-1]].remove(v)
+    else:
+        msg = "Unknown setter. This is a programming error. Please contact " \
+              "the developers."
+        logger.critical(msg)
+        raise ValueError(msg)
+
     logger.debug("Setting config item '{}' to value '{}' ({})".format(
             '/'.join(path), value_evaluated, type(value_evaluated)))
     return config
@@ -207,13 +256,12 @@ if __name__ == "__main__":
 
     for string in args.parameter:
         try:
-            keys, value_evaluated = interpret_setter(string, logger)
+            path, setter, value_evaluated = interpret_setter(string, logger)
         except ValueError:
             logger.error("Skipping this issue for now.")
             continue
-        path = keys.split(".")
         try:
-            config = set_config_option(config, path, value_evaluated, logger)
+            config = set_config_option(config, path, setter, value_evaluated, logger)
         except ValueError:
             logger.error("Skipping this issue for now.")
             continue
@@ -224,13 +272,20 @@ if __name__ == "__main__":
     config.filename = "tmp.config"
     config.write()
 
+    logger.debug("Here's the full config file: ")
+    logger.debug(config)
+
     if args.iterator != "SingleFramesIterator":
         assert(len(args.input_path)) == 1
         args.input_path = args.input_path[0]
 
+    logger.debug("Init input data.")
     i = inputdata.InputData(args.input_path, getattr(inputdata, args.iterator))
+
+    logger.debug("Init merger.")
     m = merger.SimpleMerger(i, config)
 
+    logger.debug("Run! Here we go!")
     m.run()
 
     logger.info("Config file was saved to {}.".format(config.filename))
