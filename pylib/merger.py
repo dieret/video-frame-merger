@@ -9,6 +9,10 @@ import time
 from . import util
 import configobj
 
+# todo: use for loops for all of the operations, so that we can check if the
+# operation is supported and also can apply the same operations in different
+# orders and more than once
+
 
 class Merger(object):
     """ This class overlays frames and produces an output image. """
@@ -124,7 +128,17 @@ class SimpleMerger(Merger):
             raise NotImplementedError
 
     def calc_diff(self, mean, frame):
-        return mean - frame
+        conf = self._config["m"]["diff"]
+
+        diff = mean - frame
+
+        if "median" in conf["operations"]:
+            # todo: avoid costly transformation
+            # need uin8 here
+            diff = diff.astype(np.uint8)
+            diff = cv2.medianBlur(diff, conf["median"]["size"])
+
+        return diff
 
     def calc_metric(self, diff: np.ndarray) -> np.ndarray:
         """ Converts difference to metric
@@ -161,12 +175,14 @@ class SimpleMerger(Merger):
 
         conf = self._config["m"]["mpp"]
 
-        if "blur" in conf["operations"]:
+        if "gauss" in conf["operations"]:
             metric = cv2.GaussianBlur(metric,
-                                      tuple(conf["blur"]["shape"]),
-                                      *conf["blur"]["sigmas"])
+                                      tuple(conf["gauss"]["shape"]),
+                                      *conf["gauss"]["sigmas"])
 
-        # todo: options to clear speccles
+        if "open" in conf["operations"]:
+            kernel = np.ones(conf["open"]["kernel"], np.uint8)
+            metric = cv2.morphologyEx(metric, cv2.MORPH_OPEN, kernel)
 
         if "cutoff" in conf["operations"]:
             # todo: make this take a list of thresholds and values and let
@@ -190,7 +206,10 @@ class SimpleMerger(Merger):
                               conf["edge"]["canny2"])
             edges = edges.astype(np.float)
             metric = edges
-            # todo: option to make thicker
+
+        if "dilate" in conf["operations"]:
+            kernel = np.ones(conf["dilate"]["kernel"], np.uint8)
+            metric = cv2.dilate(metric, kernel)
 
         # normalize metric
         metric /= metric.max()
@@ -203,6 +222,8 @@ class SimpleMerger(Merger):
         if conf["strategy"] in ["overlay", "overlaymean"]:
             merge = sum_layer
         elif conf["strategy"] == "add":
+            # todo: Taking care of zeros to avoid zero division.
+            # Wherever the metric is, we set the layer to zero as well.
             merge = sum_layer/sum_metric
         else:
             raise ValueError("Unknown parameter.")
@@ -218,6 +239,16 @@ class SimpleMerger(Merger):
         conf = self._config["m"]["layer"]
         layer = conf["multiply"] * frame * metric
         layer += conf["add"]
+
+        if "median" in conf["operations"]:
+            layer = layer.astype(np.uint8)
+            layer = cv2.medianBlur(layer, conf["median"]["size"])
+
+        if "gauss" in conf["operations"]:
+            layer = cv2.GaussianBlur(layer,
+                                      tuple(conf["gauss"]["shape"]),
+                                      *conf["gauss"]["sigmas"])
+
         # todo: add normalization option
         layer[layer > 255.] = 255.
         return layer
@@ -273,7 +304,7 @@ class SimpleMerger(Merger):
 
             # ** Save/Preview **
 
-            allowed = ["frame", "diff", "metric", "overlay", "sum_metric",
+            allowed = ["frame", "diff", "metric", "layer", "sum_metric",
                        "sum_layer", "merge", "final"]
 
             for item in self.save:

@@ -232,3 +232,5 @@ if __name__ == "__main__":
     m = merger.SimpleMerger(i, config)
 
     m.run()
+
+    logger.info("Config file was saved to {}.".format(config.filename))
