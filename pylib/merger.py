@@ -81,6 +81,9 @@ class Merger(object):
 
         self._logger.info("Writing to '{}'.".format(path))
 
+        if len(image.shape) == 2 or \
+                (len(image.shape) == 3 and image.shape[2] == 1):
+            image = self.scalar_to_grayscale(image)
         cv2.imwrite(path, image)
         return True
 

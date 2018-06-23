@@ -71,6 +71,10 @@ Here are some examples:
 
 ## Examples
 
+## Default
+
+    ./merge.py data/giflibrary/fencers.gif
+
 ### Merging with simple R3 metric
 
 Note: Applying a cutoff is a standard now, so we need to actively specify
