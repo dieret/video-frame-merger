@@ -104,12 +104,25 @@ def load_config_file(path: str, logger: logging.Logger) -> configobj.ConfigObj:
 
 def validate_config_file(config: configobj.ConfigObj,
                          logger: logging.Logger) -> configobj.ConfigObj:
-    """ Validate config file, i.e. check that everything is set properly. """
+    """ Validate config file, i.e. check that everything is set properly.
+    This also sets all default values."""
 
     logger.debug("Validating config file.")
 
+    # Note: The config value might be completely empty, because only the first
+    # Run of this methods sets them.
+    # However, this method gets called 2 times (one time before and one time
+    # after handling of the --parameter options).
+    # Unfortunately, if you do copy one time, an additional copy=False won't
+    # bring it back. So we start with copy=False
+    try:
+        copy_all = config["r"]["config"]["copy_all"]
+    except KeyError:
+        copy_all = False
+    print(copy_all)
+
     valid = config.validate(validate.Validator(), preserve_errors=True,
-                            copy=True)
+                            copy=copy_all)
 
     # adapted from https://stackoverflow.com/questions/14345879/
     # answer from user sgt_pats 2017
@@ -269,9 +282,12 @@ if __name__ == "__main__":
 
     config = validate_config_file(config, logger)
 
-    logger.info("Saving config file to tmp.config.")
-    config.filename = "tmp.config"
-    config.write()
+    if config["r"]["config"]["copy"]:
+        logger.info("Saving config file to tmp.config.")
+        config.filename = "tmp.config"
+        config.write()
+    else:
+        logger.info("Saving of config file DISABLED.")
 
     logger.debug("Here's the full config file: ")
     logger.debug(config)
@@ -288,5 +304,3 @@ if __name__ == "__main__":
 
     logger.debug("Run! Here we go!")
     m.run()
-
-    logger.info("Config file was saved to {}.".format(config.filename))

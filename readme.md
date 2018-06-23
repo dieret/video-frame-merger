@@ -16,16 +16,19 @@ List of command line options:
 The file ``configspec.config`` holds a description of all config values 
 and their default parameters.
 
-You can either supply your own config file to ``merge.py`` by using the
-``-c`` (``--config``) option. 
+You can supply your own config file to ``merge.py`` by using the
+``-c`` (``--config``) option. If you do not specify values for all options, then 
+the default values from ``configspec.config`` are used for those options.
 
 You can also change each config value from the command line with the
 ``-p`` (``--parameter``) option. This option is explained more in the next 
 option.
 
-After each run of ``merge.py`` will write out the _effective_ config 
+After each run, ``merge.py`` will write out the _effective_ config 
 file (with any other parameters already taken into account) to the 
-file ``tmp.config``. 
+file ``tmp.config``. By default also all unchanged values, comments and 
+indents are copied to ``tmp.config`` (if you want to disable that, disable 
+the ``r.config.copy_all`` option).
 
 ## The -p (--parameter) Option 
 
@@ -47,7 +50,7 @@ with the key ``key`` in section ``section1`` and subsection ``section2``.
 
 The value is tried to be cast to a float if it contains a ``.`` and 
 tried to be cast to an int if not. If the cast fails, it is taken as a
-string.
+string. Please use ``0`` for ``False`` and 1 for ``True``. 
 
 To specify lists, supply the values separated by ``,``, e.g. 
 ``key=value1,value2``. 
