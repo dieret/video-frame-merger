@@ -109,26 +109,31 @@ def validate_config_file(config: configobj.ConfigObj,
 
     logger.debug("Validating config file.")
 
-    # Note: The config value might be completely empty, because only the first
-    # Run of this methods sets them.
+    # 'copy' parameter of config.validate: Also copy all comments and default
+    # values from the configspecs to the config file (to be written out later)?
+    # Note: The config object might be completely empty, because only the first
+    # Run of this methods sets them from the defaults if the user did not
+    # specify a config file.
     # However, this method gets called 2 times (one time before and one time
-    # after handling of the --parameter options).
+    # after the handling of the --parameter options),
     # Unfortunately, if you do copy one time, an additional copy=False won't
-    # bring it back. So we start with copy=False
+    # bring it back. So we start with copy=False and if r.config.copy_all
+    # is set to true, copy it the second time this function is called.
     try:
         copy_all = config["r"]["config"]["copy_all"]
     except KeyError:
         copy_all = False
-    print(copy_all)
 
     valid = config.validate(validate.Validator(), preserve_errors=True,
                             copy=copy_all)
 
     # adapted from https://stackoverflow.com/questions/14345879/
     # answer from user sgt_pats 2017
+    # todo: This might need some better handling.
     for entry in configobj.flatten_errors(config, valid):
-        [_, key, error] = entry
+        [path, key, error] = entry
         if not error:
+            print("here1")
             msg = "The parameter {} was not in the config file\n".format(key)
             msg += "Please check to make sure this parameter is present and " \
                    "there are no mis-spellings."
@@ -143,8 +148,10 @@ def validate_config_file(config: configobj.ConfigObj,
                 msg += "Please set the value to be in {}".format(optionString)
                 logger.critical(msg)
                 raise ValueError(msg)
-
-        raise ValueError("Unknown error with validation.")
+            elif error:
+                msg = "Validation error (section='{}', key={}): {}".format('/'.join(path), key, error)
+                logger.error(msg)
+                raise ValueError(msg)
 
     return config
 

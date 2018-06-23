@@ -2,8 +2,10 @@
 
 ## Requirements
 
-*   OpenCV
-*   python3
+*   ``python3``
+*   ``openCV`` (``cv2`` package of ``python3``)
+*   ``ffmpeg`` (if you want to burst movies/gifs or animate a series 
+    of pictuers)
 
 ## Usage
 
@@ -50,7 +52,11 @@ with the key ``key`` in section ``section1`` and subsection ``section2``.
 
 The value is tried to be cast to a float if it contains a ``.`` and 
 tried to be cast to an int if not. If the cast fails, it is taken as a
-string. Please use ``0`` for ``False`` and 1 for ``True``. 
+string. 
+
+**Important** Boolean values: Please use ``0`` for ``False``! Pretty much 
+ anything else will evaluate to ``True`` (behaves like python's 
+ ``bool()`` cast)!
 
 To specify lists, supply the values separated by ``,``, e.g. 
 ``key=value1,value2``. 
