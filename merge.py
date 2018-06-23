@@ -204,7 +204,8 @@ def set_config_option(config: configobj.ConfigObj, path: List[str],
             msg = "Since you are using '+=' or '-=' with the -p/--parameter" \
                   " option, it looks like you want to add/remove an item " \
                   "from default value. However the default value is not a " \
-                  "list! "
+                  "list! Maybe you forgot a trailing ',' (even necessary " \
+                  "when supplying 0 or 1 list items)?"
             logger.error(msg)
             raise ValueError(msg)
         if setter == "+":
