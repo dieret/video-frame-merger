@@ -13,6 +13,41 @@ List of command line options:
 
     python3 merge.py --help
     
+This will look like this (not up to date):
+
+    usage: merge.py [-h] [-c CONFIG]
+                [-i {SingleFramesIterator,VideoFrameIterator,BurstFrameIterator}]
+                [-n NAME] [-s SAVE [SAVE ...]] [-v PREVIEW [PREVIEW ...]]
+                [-p PARAMETER [PARAMETER ...]]
+                input_path [input_path ...]
+
+    positional arguments:
+      input_path            InputData video file
+    
+    optional arguments:
+      -h, --help            show this help message and exit
+      -c CONFIG, --config CONFIG
+                            Path to config file.
+      -i {SingleFramesIterator,VideoFrameIterator,BurstFrameIterator}, --iterator {SingleFramesIterator,VideoFrameIterator,BurstFrameIterator}
+                            Frame iterator. Default: VideoFrameIterator
+      -n NAME, --name NAME  Name (will e.g. become output folder name)
+      -s SAVE [SAVE ...], --save SAVE [SAVE ...]
+                            Which steps to save.
+      -v PREVIEW [PREVIEW ...], --preview PREVIEW [PREVIEW ...]
+                            Which steps to preview.
+      -p PARAMETER [PARAMETER ...], --parameter PARAMETER [PARAMETER ...]
+                            Set parameters of your merger. Give strings like
+                            <param_name>=<param_value>. To specify subsections,
+                            use '.', e.g. 'section1.section2.key'. To give a list
+                            of values, make sure param_value contains a ',', even
+                            when passing only one value, e.g. 'key=value,'. When
+                            passing multiple list members, so key=value1,value2.We
+                            will try to convert each value to a float (if it
+                            contains a dot) or an int. If both fail, we take it as
+                            a string. For lists, you can also write '+=' or '-='
+                            to add or remove values from the list.
+
+    
 ## The config file
 
 The file ``configspec.config`` holds a description of all config values 
@@ -81,13 +116,13 @@ careful that those also always run.
     
     ./merge.py data/untracked/rad.mp4 -v metric merge
 
-### Merging with simple R3 metric
+### Merging with simple euclidean metric
 
 Note: Applying a cutoff is a standard now, so we need to actively specify
 the operations applied to the metric to remove it. Here we only apply a
-small blur on the (R3) metric.
+small blur on the (euclidean) metric.
 
-    ./merge.py -n examples/r3metric data/giflibrary/fencers.gif -v metric merge -p m.mpp.operations=gauss,
+    ./merge.py -n examples/euclideanmetric data/giflibrary/fencers.gif -v metric merge -p m.mpp.operations=gauss,
     
     ./merge.py data/untracked/rad.mp4 -v metric merge -p m.mpp.operations=gauss,
 

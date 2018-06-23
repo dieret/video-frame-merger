@@ -13,6 +13,8 @@ import configobj
 # operation is supported and also can apply the same operations in different
 # orders and more than once
 
+# todo: add automatic video output, so that we don't have to use ffmpeg
+
 
 class Merger(object):
     """ This class overlays frames and produces an output image. """
@@ -153,8 +155,17 @@ class SimpleMerger(Merger):
 
         conf = self._config["m"]["metric"]
 
-        if conf["strategy"] == "r3":
-            metric = np.sqrt(np.sum(np.square(diff/255), axis=-1))
+        if conf["strategy"] == "euclidean":
+            # no need for /255 since we norm afterwards
+            metric = np.sqrt(np.sum(np.square(diff), axis=-1))
+        elif conf["strategy"] == "manhattan":
+            metric = np.sum(np.abs(diff), axis=-1)
+        elif conf["strategy"] == "max":
+            metric = np.abs(diff).max(axis=-1)
+        elif conf["strategy"] == "p":
+            # fixme: not working yet
+            metric = np.power(np.sum(np.power(diff, conf["p"]["p"]), axis=-1),
+                              1./conf["p"]["p"])
         else:
             raise NotImplementedError
 

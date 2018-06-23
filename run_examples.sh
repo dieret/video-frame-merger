@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# This script will run all examples from the readme 
+# This script will run all examples from the readme
 
 commands=$(grep "    ./merge.py -n examples/" readme.md | sed 's/    //g')
 

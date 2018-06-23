@@ -7,8 +7,12 @@ import cv2
 import os.path
 import numpy as np
 
+# todo: add options to scale down input images right away
 
-# todo: Probably we don't need this abstraction layer
+# todo: add option to skip frames/reduce the frame rate
+
+# todo: Probably we don't need this abstraction layer -> remove!
+
 class InputData(object):
     """ This class decides which FrameIterator class to take and also can
     load all images into ram. """
@@ -62,6 +66,7 @@ class FrameIterator(object):
         self.index = 0
 
     def __iter__(self):
+        # todo: probably add a self.rewind here
         return self
 
     def get_frame(self, index=None):
@@ -71,8 +76,6 @@ class FrameIterator(object):
         self.logger.debug("Rewinding.")
         self.index = 0
         self._rewind()
-
-        self.time_previous = None
 
     def _rewind(self):
         pass
@@ -188,8 +191,6 @@ class VideoFrameIterator(FrameIterator):
         frame = frame.astype(np.float)
 
         return frame
-
-
 
     @property
     def number_images(self):
