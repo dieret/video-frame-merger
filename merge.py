@@ -89,8 +89,8 @@ def load_config_file(path: str, logger: logging.Logger) -> configobj.ConfigObj:
     logger.debug("Loading config file.")
 
     try:
-        config = configobj.ConfigObj(args.config,
-                                     configspec="configspec.config")
+        path = os.path.join(util.get_script_path(), "configspec.config")
+        config = configobj.ConfigObj(args.config, configspec=path)
     except:
         msg = "Some error occurred during reading of config file. " \
               "Aborting now."
@@ -154,6 +154,9 @@ def validate_config_file(config: configobj.ConfigObj,
                 raise ValueError(msg)
 
     return config
+
+
+# todo: needed: crack down on name shadowing
 
 
 def interpret_setter(string: str, logger: logging.Logger) -> (List[str], str, Any):

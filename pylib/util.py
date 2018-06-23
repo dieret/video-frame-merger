@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 
+import os
+import sys
+
 
 # todo:docstring
 def get_all_subclasses(cls):
@@ -10,6 +13,7 @@ def get_all_subclasses(cls):
 # todo: docstring
 def get_all_subclasses_names(cls):
     return [c.__name__ for c in get_all_subclasses(cls)]
+
 
 # todo: docstring
 def new_size(old_size, max_size):
@@ -36,3 +40,8 @@ def new_size(old_size, max_size):
     else:
         new_size = (old_height, old_width)
     return new_size
+
+
+# todo: docstring
+def get_script_path():
+    return os.path.dirname(os.path.realpath(sys.argv[0]))
