@@ -6,48 +6,52 @@
 *   ``openCV`` (``cv2`` package of ``python3``)
 *   ``ffmpeg`` (if you want to burst movies/gifs or animate a series 
     of pictuers)
+*   ``pip install opencv-contrib-python`` to open mp4s
 
 ## Usage
 
 List of command line options:
 
-    python3 merge.py --help
-    
+```sh
+python3 merge.py --help
+```
+
 This will look like this (not up to date):
 
-    usage: merge.py [-h] [-c CONFIG]
-                [-i {SingleFramesIterator,VideoFrameIterator,BurstFrameIterator}]
-                [-n NAME] [-s SAVE [SAVE ...]] [-v PREVIEW [PREVIEW ...]]
-                [-p PARAMETER [PARAMETER ...]]
-                input_path [input_path ...]
+```
+usage: merge.py [-h] [-c CONFIG]
+            [-i {SingleFramesIterator,VideoFrameIterator,BurstFrameIterator}]
+            [-n NAME] [-s SAVE [SAVE ...]] [-v PREVIEW [PREVIEW ...]]
+            [-p PARAMETER [PARAMETER ...]]
+            input_path [input_path ...]
 
-    positional arguments:
-      input_path            InputData video file
-    
-    optional arguments:
-      -h, --help            show this help message and exit
-      -c CONFIG, --config CONFIG
-                            Path to config file.
-      -i {SingleFramesIterator,VideoFrameIterator,BurstFrameIterator}, --iterator {SingleFramesIterator,VideoFrameIterator,BurstFrameIterator}
-                            Frame iterator. Default: VideoFrameIterator
-      -n NAME, --name NAME  Name (will e.g. become output folder name)
-      -s SAVE [SAVE ...], --save SAVE [SAVE ...]
-                            Which steps to save.
-      -v PREVIEW [PREVIEW ...], --preview PREVIEW [PREVIEW ...]
-                            Which steps to preview.
-      -p PARAMETER [PARAMETER ...], --parameter PARAMETER [PARAMETER ...]
-                            Set parameters of your merger. Give strings like
-                            <param_name>=<param_value>. To specify subsections,
-                            use '.', e.g. 'section1.section2.key'. To give a list
-                            of values, make sure param_value contains a ',', even
-                            when passing only one value, e.g. 'key=value,'. When
-                            passing multiple list members, so key=value1,value2.We
-                            will try to convert each value to a float (if it
-                            contains a dot) or an int. If both fail, we take it as
-                            a string. For lists, you can also write '+=' or '-='
-                            to add or remove values from the list.
+positional arguments:
+  input_path            InputData video file
 
-    
+optional arguments:
+  -h, --help            show this help message and exit
+  -c CONFIG, --config CONFIG
+                        Path to config file.
+  -i {SingleFramesIterator,VideoFrameIterator,BurstFrameIterator}, --iterator {SingleFramesIterator,VideoFrameIterator,BurstFrameIterator}
+                        Frame iterator. Default: VideoFrameIterator
+  -n NAME, --name NAME  Name (will e.g. become output folder name)
+  -s SAVE [SAVE ...], --save SAVE [SAVE ...]
+                        Which steps to save.
+  -v PREVIEW [PREVIEW ...], --preview PREVIEW [PREVIEW ...]
+                        Which steps to preview.
+  -p PARAMETER [PARAMETER ...], --parameter PARAMETER [PARAMETER ...]
+                        Set parameters of your merger. Give strings like
+                        <param_name>=<param_value>. To specify subsections,
+                        use '.', e.g. 'section1.section2.key'. To give a list
+                        of values, make sure param_value contains a ',', even
+                        when passing only one value, e.g. 'key=value,'. When
+                        passing multiple list members, so key=value1,value2.We
+                        will try to convert each value to a float (if it
+                        contains a dot) or an int. If both fail, we take it as
+                        a string. For lists, you can also write '+=' or '-='
+                        to add or remove values from the list.
+```
+
 ## The config file
 
 The file ``configspec.config`` holds a description of all config values 
@@ -72,7 +76,7 @@ the ``r.config.copy_all`` option).
 Supply one or more option with the ``-p`` (``--parameter``) option:
 
     -p <key/value pair 1> <key value pair 2>
-    
+
 **Important:** Only use ``-p`` once! Do ``-p <key/value pair 1> <key value pair 2>`` 
 instead of ``-p <key/value pair 1> -p <key value pair 2>``. 
 
@@ -112,9 +116,11 @@ careful that those also always run.
 
 ## Default
 
-    ./merge.py -n examples/default data/giflibrary/fencers.gif 
-    
-    ./merge.py data/untracked/rad.mp4 -v metric merge
+```sh
+./merge.py -n examples/default data/giflibrary/fencers.gif 
+
+./merge.py data/untracked/rad.mp4 -v metric merge
+```
 
 ### Merging with simple euclidean metric
 
@@ -122,18 +128,21 @@ Note: Applying a cutoff is a standard now, so we need to actively specify
 the operations applied to the metric to remove it. Here we only apply a
 small blur on the (euclidean) metric.
 
-    ./merge.py -n examples/euclideanmetric data/giflibrary/fencers.gif -v metric merge -p m.mpp.operations=gauss,
-    
-    ./merge.py data/untracked/rad.mp4 -v metric merge -p m.mpp.operations=gauss,
+```sh
+./merge.py -n examples/euclideanmetric data/giflibrary/fencers.gif -v metric merge -p m.mpp.operations=gauss,
+
+./merge.py data/untracked/rad.mp4 -v metric merge -p m.mpp.operations=gauss,
+```
 
 
 ### Cutoff merging
 
-    ./merge.py -n examples/cutoff data/giflibrary/fencers.gif -v metric merge -p m.mpp.cutoff.min=0.0001
-    
-    ./merge.py data/untracked/rad.mp4 -v metric merge -p m.mpp.cutoff.min=0.0001
+```sh
+./merge.py -n examples/cutoff data/giflibrary/fencers.gif -v metric merge -p m.mpp.cutoff.min=0.0001
 
- 
+./merge.py data/untracked/rad.mp4 -v metric merge -p m.mpp.cutoff.min=0.0001 
+```
+
 This is using the default overlay (``m.overlay.strategy=add``). 
 Set ``m.mpp.cutoff.min`` to a small number, e.g. ``0.1/number frames``. 
 It must be mon zero, because else our background becomes black. 
@@ -142,22 +151,24 @@ It must be mon zero, because else our background becomes black.
 
 Note: If we want the overlay to not fade, we need to set ``m/mpp/cutoff/min`` to zero.
 
-    ./merge.py -n examples/overlay data/giflibrary/fencers.gif -v merge -s final merge -p m.mpp.cutoff.min=0 m.overlay.strategy=overlay 
-    
+```sh
+./merge.py -n examples/overlay data/giflibrary/fencers.gif -v merge -s final merge -p m.mpp.cutoff.min=0 m.overlay.strategy=overlay 
+```
+
 If we want thad fade effect, e.g. run 
 
-    ./merge.py data/untracked/rad.mp4 -v metric merge -p m.mpp.cutoff.min=0.1 m.overlay.strategy=overlay 
+```sh
+./merge.py data/untracked/rad.mp4 -v metric merge -p m.mpp.cutoff.min=0.1 m.overlay.strategy=overlay 
 
-    ./merge.py -n examples/overlay2 data/giflibrary/fencers.gif -s merge -v metric merge -p m.mpp.cutoff.min=0.1 m.overlay.strategy=overlay 
-    
+./merge.py -n examples/overlay2 data/giflibrary/fencers.gif -s merge -v metric merge -p m.mpp.cutoff.min=0.1 m.overlay.strategy=overlay 
+```
+
 Or for a slightly slower fading ``mp.mpp.cutoff.min=0.05``.
 
 ### White grid lines
 
-    ./merge.py -n examples/whitegrid data/giflibrary/fencers.gif -v metric merge -p m.diff.operations=, m.mpp.operations=gauss,cutoff,edge m.overlay.strategy=overlay m.layer.multiply=100
+```sh
+./merge.py -n examples/whitegrid data/giflibrary/fencers.gif -v metric merge -p m.diff.operations=, m.mpp.operations=gauss,cutoff,edge m.overlay.strategy=overlay m.layer.multiply=100
 
-    ./merge.py data/untracked/rad.mp4 -v metric merge -p m.diff.operations=, m.mpp.operations=gauss,cutoff,edge,open,dilate m.mpp.dilate.kernel=2,2  m.mpp.open.kernel=5,5 m.overlay.strategy=overlay m.layer.multiply=100
-
-    
-
- 
+./merge.py data/untracked/rad.mp4 -v metric merge -p m.diff.operations=, m.mpp.operations=gauss,cutoff,edge,open,dilate m.mpp.dilate.kernel=2,2  m.mpp.open.kernel=5,5 m.overlay.strategy=overlay m.layer.multiply=100
+```
