@@ -13,12 +13,14 @@ import numpy as np
 
 # todo: Probably we don't need this abstraction layer -> remove!
 
+
 class InputData(object):
-    """ This class decides which FrameIterator class to take and also can
-    load all images into ram. """
+    """This class decides which FrameIterator class to take and also can
+    load all images into ram."""
+
     def __init__(self, path, frame_iterator):
         self.path = path
-        self.keep_in_ram = False # I'd be really careful with that one
+        self.keep_in_ram = False  # I'd be really careful with that one
         self._as_list = None
         self._frame_iterator = frame_iterator(self.path)
         self.logger = log.setup_logger("InputData")
@@ -58,8 +60,9 @@ class InputData(object):
 
 # todo: add option to preprocess frames
 class FrameIterator(object):
-    """ This class will be subclassed by implementing the get_frame method.
-    Iterate over this class to get all frames of vide/input. """
+    """This class will be subclassed by implementing the get_frame method.
+    Iterate over this class to get all frames of vide/input."""
+
     def __init__(self):
         self.logger = log.setup_logger("FrameIterator")
 
@@ -91,9 +94,9 @@ class FrameIterator(object):
             self.logger.warning(
                 "Shapes don't match: Frame {} has shape {}, whereas the "
                 "first image had '{}'. Skip".format(
-                    self.index,
-                    frame.shape,
-                    self.shape))
+                    self.index, frame.shape, self.shape
+                )
+            )
             return self.__next__
 
         return frame
@@ -108,11 +111,11 @@ class FrameIterator(object):
 
     @property
     def fps(self):
-        return 1.
+        return 1.0
 
     def get_frame_manually(self, index):
         # e.g. for gifs that do not support cv2.CAP_PROP_POS_FRAMES
-        assert(index >= 0)
+        assert index >= 0
         num = 0
         self.rewind()
         while num <= index:
@@ -133,13 +136,14 @@ class FrameIterator(object):
 
 
 class VideoFrameIterator(FrameIterator):
-    """ This class gets all the frames of a video on the fly. """
+    """This class gets all the frames of a video on the fly."""
+
     def __init__(self, path: str):
         super().__init__()
         if not os.path.exists(path):
             self.logger.critical("File does not exist: '{}'".format(self.path))
             raise ValueError
-        self.path = path
+        self.path: str = path
         self.opened = cv2.VideoCapture(self.path)
 
         self._number_images = None
@@ -165,16 +169,20 @@ class VideoFrameIterator(FrameIterator):
                 self.opened.set(cv2.CAP_PROP_POS_FRAMES, index)
                 okay, frame = self.opened.read()
                 if not okay:
-                    msg = "Getting frame {} automatically failed (e.g. " \
-                          "common for gifs). Going the long way and " \
-                          "reading the file from start until we reach the" \
-                          "frame. This might be slow. ".format(index)
+                    msg = (
+                        "Getting frame {} automatically failed (e.g. "
+                        "common for gifs). Going the long way and "
+                        "reading the file from start until we reach the"
+                        "frame. This might be slow. ".format(index)
+                    )
                     self.logger.warning(msg)
                     frame = self.get_frame_manually(index)
                 self.opened.set(cv2.CAP_PROP_POS_FRAMES, self.index)
             else:
-                msg = "Out of range: Condition {} <= index = {} < {} " \
-                      "failed!".format(0, index, self.number_images)
+                msg = (
+                    "Out of range: Condition {} <= index = {} < {} "
+                    "failed!".format(0, index, self.number_images)
+                )
                 self.logger.error(msg)
                 return None
 
@@ -182,7 +190,9 @@ class VideoFrameIterator(FrameIterator):
                 msg = "Failed to get frame {} (counting from 0)!".format(index)
                 self.logger.warning(msg)
             else:
-                msg = "Successfully got frame {} (counting from 0).".format(index)
+                msg = "Successfully got frame {} (counting from 0).".format(
+                    index
+                )
                 self.logger.debug(msg)
 
         # note: cv2.imread returns us an array in int8, so we need to
@@ -198,12 +208,16 @@ class VideoFrameIterator(FrameIterator):
             self._number_images = int(self.opened.get(cv2.CAP_PROP_FRAME_COUNT))
             if not (0 < self._number_images < 1e6):
                 # (for gifs)
-                msg = "Automatic retrieval of number of frames failed. " \
-                      "(e.g. happens for gifs). Counting by going through " \
-                      "the whole file. This might be slow."
+                msg = (
+                    "Automatic retrieval of number of frames failed. "
+                    "(e.g. happens for gifs). Counting by going through "
+                    "the whole file. This might be slow."
+                )
                 self.logger.warning(msg)
                 self._number_images = self.number_images_manual()
-            self.logger.debug("Updated number images to {}.".format(self._number_images))
+            self.logger.debug(
+                "Updated number images to {}.".format(self._number_images)
+            )
         return self._number_images
 
     @property
@@ -212,7 +226,8 @@ class VideoFrameIterator(FrameIterator):
             self._shape = (
                 int(self.opened.get(cv2.CAP_PROP_FRAME_HEIGHT)),
                 int(self.opened.get(cv2.CAP_PROP_FRAME_WIDTH)),
-                3)
+                3,
+            )
             self.logger.debug("Updated shape to {}".format(self._shape))
         return self._shape
 
@@ -224,7 +239,8 @@ class VideoFrameIterator(FrameIterator):
 
 
 class SingleFramesIterator(FrameIterator):
-    """ This class takes a list of files as frames. """
+    """This class takes a list of files as frames."""
+
     def __init__(self, video_files):
         super().__init__()
         self.burst_base_dir = os.path.join("data", "burst")
@@ -261,15 +277,16 @@ class SingleFramesIterator(FrameIterator):
 
 
 class BurstFrameIterator(SingleFramesIterator):
-    """ This class first bursts a video file into single images, then
-    uses SingleFramesIterator to iterate over them. """
+    """This class first bursts a video file into single images, then
+    uses SingleFramesIterator to iterate over them."""
+
     def __init__(self, path):
         self.logger = log.setup_logger("FrameIterator")
         self.path = path
         self.burst_base_dir = os.path.join("data", "burst")
         self.burst_subfolder = os.path.join(
-            self.burst_base_dir,
-            os.path.splitext(os.path.basename(self.path))[0])
+            self.burst_base_dir, os.path.splitext(os.path.basename(self.path))[0]
+        )
 
         self._burst_file()
 
@@ -279,15 +296,19 @@ class BurstFrameIterator(SingleFramesIterator):
 
     def _burst_file(self):
         # todo: maybe implement check if we even need that
-        self.logger.debug("Bursting '{}' to '{}'.".format(self.path, self.burst_subfolder))
+        self.logger.debug(
+            "Bursting '{}' to '{}'.".format(self.path, self.burst_subfolder)
+        )
         self._get_clean_folder(self.burst_subfolder)
-        destination = os.path.join(self.burst_subfolder,
-                                   os.path.splitext(os.path.basename(self.path))[0] + "%5d.png")
+        destination = os.path.join(
+            self.burst_subfolder,
+            os.path.splitext(os.path.basename(self.path))[0] + "%5d.png",
+        )
         call(["ffmpeg", "-loglevel", "warning", "-i", self.path, destination])
 
     @staticmethod
     def _get_clean_folder(folder):
-        """ Clear folder if existent, create if nonexistent """
+        """Clear folder if existent, create if nonexistent"""
         if os.path.exists(folder):
             shutil.rmtree(folder)
         os.makedirs(folder)
@@ -296,4 +317,6 @@ class BurstFrameIterator(SingleFramesIterator):
         if not os.path.isdir(folder):
             self.logger.critical("'{}' is not a folder. Abort!".format(folder))
             raise ValueError
-        return [os.path.join(folder, filename) for filename in os.listdir(folder)]
+        return [
+            os.path.join(folder, filename) for filename in os.listdir(folder)
+        ]

@@ -6,8 +6,9 @@ import sys
 
 # todo:docstring
 def get_all_subclasses(cls):
-        return set(cls.__subclasses__()).union(
-            [s for c in cls.__subclasses__() for s in get_all_subclasses(c)])
+    return set(cls.__subclasses__()).union(
+        [s for c in cls.__subclasses__() for s in get_all_subclasses(c)]
+    )
 
 
 # todo: docstring
@@ -29,13 +30,13 @@ def new_size(old_size, max_size):
         if max_width >= old_width:
             new_size = (old_height, old_width)
         else:
-            scale = max_width/old_width
+            scale = max_width / old_width
             new_size = (scale * old_height, scale * old_width)
     elif max_height:
         if max_height >= old_height:
             new_size = (old_height, old_width)
         else:
-            scale = max_height/old_height
+            scale = max_height / old_height
             new_size = (scale * old_height, scale * old_width)
     else:
         new_size = (old_height, old_width)

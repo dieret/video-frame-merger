@@ -9,38 +9,32 @@ import validate
 import pylib.log as log
 import os.path
 import logging
-from typing import List, Any
+from typing import List, Any, Tuple
 
 
 def get_cli_options(logger: logging.Logger):
-    """ Return command line options. """
+    """Return command line options."""
     logger.debug("Parsing command line options.")
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
-        dest="input_path",
-        type=str,
-        nargs="+",
-        help="InputData video file"
+        dest="input_path", type=str, nargs="+", help="InputData video file"
     )
     parser.add_argument(
-        "-c",
-        "--config",
-        default=None,
-        help="Path to config file."
+        "-c", "--config", default=None, help="Path to config file."
     )
     parser.add_argument(
         "-i",
         "--iterator",
         default="VideoFrameIterator",
         help="Frame iterator. Default: VideoFrameIterator",
-        choices=util.get_all_subclasses_names(inputdata.FrameIterator)
+        choices=util.get_all_subclasses_names(inputdata.FrameIterator),
     )
     parser.add_argument(
         "-n",
         "--name",
         default=None,
-        help="Name (will e.g. become output folder name)"
+        help="Name (will e.g. become output folder name)",
     )
     parser.add_argument(
         "-s",
@@ -48,7 +42,7 @@ def get_cli_options(logger: logging.Logger):
         type=str,
         nargs="+",
         default=None,
-        help="Which steps to save."
+        help="Which steps to save.",
     )
     parser.add_argument(
         "-v",
@@ -56,7 +50,7 @@ def get_cli_options(logger: logging.Logger):
         type=str,
         nargs="+",
         default=None,
-        help="Which steps to preview."
+        help="Which steps to preview.",
     )
     parser.add_argument(
         "-p",
@@ -65,16 +59,16 @@ def get_cli_options(logger: logging.Logger):
         nargs="+",
         default=[],
         help="Set parameters of your merger. Give strings like "
-             "<param_name>=<param_value>. "
-             "To specify subsections, use '.', e.g. 'section1.section2.key'. "
-             "To give a list of values, make sure "
-             "param_value contains a ',', even when passing only one value, "
-             "e.g. 'key=value,'. When passing multiple list members, so "
-             "key=value1,value2."
-             "We will try to convert each value to"
-             " a float (if it contains a dot) or an int. If both fail, we "
-             "take it as a string. For lists, you can also write '+=' or '-=' "
-             "to add or remove values from the list. "
+        "<param_name>=<param_value>. "
+        "To specify subsections, use '.', e.g. 'section1.section2.key'. "
+        "To give a list of values, make sure "
+        "param_value contains a ',', even when passing only one value, "
+        "e.g. 'key=value,'. When passing multiple list members, so "
+        "key=value1,value2."
+        "We will try to convert each value to"
+        " a float (if it contains a dot) or an int. If both fail, we "
+        "take it as a string. For lists, you can also write '+=' or '-=' "
+        "to add or remove values from the list. ",
     )
 
     return parser.parse_args()
@@ -82,8 +76,10 @@ def get_cli_options(logger: logging.Logger):
 
 def load_config_file(path: str, logger: logging.Logger) -> configobj.ConfigObj:
     if path and not os.path.exists(args.config):
-        logger.error("Config file '{}' does not exist. Falling back to "
-                     "default.".format(args.config))
+        logger.error(
+            "Config file '{}' does not exist. Falling back to "
+            "default.".format(args.config)
+        )
         args.config = "tmp.config"
 
     logger.debug("Loading config file.")
@@ -91,9 +87,8 @@ def load_config_file(path: str, logger: logging.Logger) -> configobj.ConfigObj:
     try:
         path = os.path.join(util.get_script_path(), "configspec.config")
         config = configobj.ConfigObj(args.config, configspec=path)
-    except:
-        msg = "Some error occurred during reading of config file. " \
-              "Aborting now."
+    except Exception as e:
+        msg = f"{e} error occurred during reading of config file. Aborting now."
         logger.critical(msg)
         raise ValueError
 
@@ -102,9 +97,10 @@ def load_config_file(path: str, logger: logging.Logger) -> configobj.ConfigObj:
     return config
 
 
-def validate_config_file(config: configobj.ConfigObj,
-                         logger: logging.Logger) -> configobj.ConfigObj:
-    """ Validate config file, i.e. check that everything is set properly.
+def validate_config_file(
+    config: configobj.ConfigObj, logger: logging.Logger
+) -> configobj.ConfigObj:
+    """Validate config file, i.e. check that everything is set properly.
     This also sets all default values."""
 
     logger.debug("Validating config file.")
@@ -124,8 +120,9 @@ def validate_config_file(config: configobj.ConfigObj,
     except KeyError:
         copy_all = False
 
-    valid = config.validate(validate.Validator(), preserve_errors=True,
-                            copy=copy_all)
+    valid = config.validate(
+        validate.Validator(), preserve_errors=True, copy=copy_all
+    )
 
     # adapted from https://stackoverflow.com/questions/14345879/
     # answer from user sgt_pats 2017
@@ -134,21 +131,27 @@ def validate_config_file(config: configobj.ConfigObj,
         [path, key, error] = entry
         if not error:
             msg = "The parameter {} was not in the config file\n".format(key)
-            msg += "Please check to make sure this parameter is present and " \
-                   "there are no mis-spellings."
+            msg += (
+                "Please check to make sure this parameter is present and "
+                "there are no mis-spellings."
+            )
             logger.critical(msg)
             raise ValueError(msg)
 
         if key is not None:
             if isinstance(error, validate.VdtValueError):
                 optionString = config.configspec[key]
-                msg = "The parameter {} was set to {} which is not one of " \
-                      "the allowed values\n".format(key, config[key])
+                msg = (
+                    "The parameter {} was set to {} which is not one of "
+                    "the allowed values\n".format(key, config[key])
+                )
                 msg += "Please set the value to be in {}".format(optionString)
                 logger.critical(msg)
                 raise ValueError(msg)
             elif error:
-                msg = "Validation error (section='{}', key={}): {}".format('/'.join(path), key, error)
+                msg = "Validation error (section='{}', key={}): {}".format(
+                    "/".join(path), key, error
+                )
                 logger.error(msg)
                 raise ValueError(msg)
 
@@ -158,12 +161,16 @@ def validate_config_file(config: configobj.ConfigObj,
 # todo: needed: crack down on name shadowing
 
 
-def interpret_setter(string: str, logger: logging.Logger) -> (List[str], str, Any):
-    """ Interpret strings such as 'sec1.mykey=5' bt splitting them up in a key 
-    and a evaluated value (float, int, string or list thereof). """
+def interpret_setter(
+    string: str, logger: logging.Logger
+) -> Tuple[List[str], str, Any]:
+    """Interpret strings such as 'sec1.mykey=5' bt splitting them up in a key
+    and a evaluated value (float, int, string or list thereof)."""
     if not string.count("=") == 1:
-        logger.error("Do you want to set a parameter with '{}'? If so, "
-                     "this should have exactly one '='!")
+        logger.error(
+            "Do you want to set a parameter with '{}'? If so, "
+            "this should have exactly one '='!"
+        )
         raise ValueError
 
     keys, value_str = string.split("=")
@@ -182,35 +189,45 @@ def interpret_setter(string: str, logger: logging.Logger) -> (List[str], str, An
 
     if "," in value_str:
         # assuming this is a list
-        value_evaluated = []
+        value_evaluated: List[Any] = []
         for s in value_str.split(","):
             s = s.strip()
             if not s:
                 continue
             try:
-                v = float(s) if '.' in s else int(s)
+                v = float(s) if "." in s else int(s)  # type: ignore
             except ValueError:
-                v = s
+                v = s  # type: ignore
             value_evaluated.append(v)
     else:
         try:
-            value_evaluated = float(value_str) if '.' in value_str else int(value_str)
+            value_evaluated = (
+                float(value_str) if "." in value_str else int(value_str)  # type: ignore
+            )
         except ValueError:
-            value_evaluated = value_str
+            value_evaluated = value_str  # type: ignore
 
     path = keys.split(".")
 
-    logger.debug("Path='{}', setter='{}', value='{}'.".format(
-        path, setter, value_evaluated))
+    logger.debug(
+        "Path='{}', setter='{}', value='{}'.".format(
+            path, setter, value_evaluated
+        )
+    )
 
     return path, setter, value_evaluated
 
 
-def set_config_option(config: configobj.ConfigObj, path: List[str],
-                      setter: str, value: Any, logger: logging.Logger):
-    """ Example: set_config_option(config, ['sec1', 'sec2', 'key'], 5, logger) 
-    will do config['sec1']['sec2']['key'] = 5 and return the new config 
-    object. """
+def set_config_option(
+    config: configobj.ConfigObj,
+    path: List[str],
+    setter: str,
+    value: Any,
+    logger: logging.Logger,
+):
+    """Example: set_config_option(config, ['sec1', 'sec2', 'key'], 5, logger)
+    will do config['sec1']['sec2']['key'] = 5 and return the new config
+    object."""
     this_config = config
     _path = ""
     for key in path[:-1]:
@@ -226,41 +243,52 @@ def set_config_option(config: configobj.ConfigObj, path: List[str],
         this_config[path[-1]] = value
     elif setter in ["+", "-"]:
         if not isinstance(value, list):
-            msg = "Since you are using '+=' or '-=' with the -p/--parameter" \
-                  " option, it looks like you want to add/remove an item " \
-                  "from default value. However the default value is not a " \
-                  "list! Maybe you forgot a trailing ',' (even necessary " \
-                  "when supplying 0 or 1 list items)?"
+            msg = (
+                "Since you are using '+=' or '-=' with the -p/--parameter"
+                " option, it looks like you want to add/remove an item "
+                "from default value. However the default value is not a "
+                "list! Maybe you forgot a trailing ',' (even necessary "
+                "when supplying 0 or 1 list items)?"
+            )
             logger.error(msg)
             raise ValueError(msg)
         if setter == "+":
             for v in value:
                 if v in previous_value:
-                    msg = "Since you are using '+=' with the -p/--parameter" \
-                          " option, it looks like you want to add an item " \
-                          "from default value. However the default value " \
-                          "already contains your value '{}'!".format(v)
+                    msg = (
+                        "Since you are using '+=' with the -p/--parameter"
+                        " option, it looks like you want to add an item "
+                        "from default value. However the default value "
+                        "already contains your value '{}'!".format(v)
+                    )
                     logger.warning(msg)
                 else:
                     this_config[path[-1]].append(v)
         if setter == "-":
             for v in value:
-                if not v in previous_value:
-                    msg = "Since you are using '-=' with the -p/--parameter" \
-                          " option, it looks like you want to remove an item " \
-                          "from default value. However the default value " \
-                          "does not even contain your value '{}'!".format(v)
+                if v not in previous_value:
+                    msg = (
+                        "Since you are using '-=' with the -p/--parameter"
+                        " option, it looks like you want to remove an item "
+                        "from default value. However the default value "
+                        "does not even contain your value '{}'!".format(v)
+                    )
                     logger.warning(msg)
                 else:
                     this_config[path[-1]].remove(v)
     else:
-        msg = "Unknown setter. This is a programming error. Please contact " \
-              "the developers."
+        msg = (
+            "Unknown setter. This is a programming error. Please contact "
+            "the developers."
+        )
         logger.critical(msg)
         raise ValueError(msg)
 
-    logger.debug("Set config item '{}' to value '{}' ({})".format(
-            '/'.join(path), this_config[path[-1]], type(this_config[path[-1]])))
+    logger.debug(
+        "Set config item '{}' to value '{}' ({})".format(
+            "/".join(path), this_config[path[-1]], type(this_config[path[-1]])
+        )
+    )
     return config
 
 
@@ -285,7 +313,9 @@ if __name__ == "__main__":
             logger.error("Skipping this issue for now.")
             continue
         try:
-            config = set_config_option(config, path, setter, value_evaluated, logger)
+            config = set_config_option(
+                config, path, setter, value_evaluated, logger
+            )
         except ValueError:
             logger.error("Skipping this issue for now.")
             continue
@@ -303,7 +333,7 @@ if __name__ == "__main__":
     logger.debug(config)
 
     if args.iterator != "SingleFramesIterator":
-        assert(len(args.input_path)) == 1
+        assert (len(args.input_path)) == 1
         args.input_path = args.input_path[0]
 
     logger.debug("Init input data.")

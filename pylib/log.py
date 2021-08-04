@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import logging
+
 try:
     import colorlog
 except ImportError:
@@ -8,7 +9,7 @@ except ImportError:
 
 
 def setup_logger(name="Logger"):
-    """ Sets up a logging.Logger with the name $name. If the colorlog module
+    """Sets up a logging.Logger with the name $name. If the colorlog module
     is available, the logger will use colors, otherwise it will be in b/w.
     The colorlog module is available at
     https://github.com/borntyping/python-colorlog
@@ -34,18 +35,21 @@ def setup_logger(name="Logger"):
     _logger.setLevel(logging.DEBUG)
     if colorlog is not None:
         sh = colorlog.StreamHandler()
-        log_colors = {'DEBUG':    'cyan',
-                      'INFO':     'green',
-                      'WARNING':  'yellow',
-                      'ERROR':    'red',
-                      'CRITICAL': 'red'}
+        log_colors = {
+            "DEBUG": "cyan",
+            "INFO": "green",
+            "WARNING": "yellow",
+            "ERROR": "red",
+            "CRITICAL": "red",
+        }
         formatter = colorlog.ColoredFormatter(
-            '%(log_color)s%(name)s:%(levelname)s:%(message)s',
-            log_colors=log_colors)
+            "%(log_color)s%(name)s:%(levelname)s:%(message)s",
+            log_colors=log_colors,
+        )
     else:
         # no colorlog available:
         sh = logging.StreamHandler()
-        formatter = logging.Formatter('%(name)s:%(levelname)s:%(message)s')
+        formatter = logging.Formatter("%(name)s:%(levelname)s:%(message)s")
     sh.setFormatter(formatter)
     sh.setLevel(logging.DEBUG)
     _logger.addHandler(sh)
