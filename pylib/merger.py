@@ -300,6 +300,11 @@ class SimpleMerger(Merger):
 
         for index, frame in enumerate(self._input.get_frames()):
 
+            sample_rate = self._config["m"]["sampling"]
+            if sample_rate:
+                if index % sample_rate != 0:
+                    continue
+
             if index >= 1:
                 fps = index / (time.time() - start_time)
             else:
