@@ -2,6 +2,7 @@
 
 [![Black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/python/black)
 [![pre-commit.ci status](https://results.pre-commit.ci/badge/github/dieret/video-frame-merger/master.svg)](https://results.pre-commit.ci/latest/github/dieret/video-frame-merger/master)
+[![License](https://img.shields.io/github/license/dieret/video-frame-merger.svg)](https://github.com/dieret/video-frame-merger/blob/master/LICENSE.txt)
 [![PR welcome](https://img.shields.io/badge/PR-Welcome-%23FF8300.svg)](https://git-scm.com/book/en/v2/GitHub-Contributing-to-a-Project)
 
 ## Requirements
