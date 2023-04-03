@@ -20,7 +20,6 @@ class Merger(object):
     """This class overlays frames and produces an output image."""
 
     def __init__(self, inpt, config: configobj.ConfigObj):
-
         self._input = inpt
         self._config = config
 
@@ -299,7 +298,6 @@ class SimpleMerger(Merger):
         start_time = time.time()
 
         for index, frame in enumerate(self._input.get_frames()):
-
             sample_rate = self._config["m"]["sampling"]
             if sample_rate:
                 if index % sample_rate != 0:
